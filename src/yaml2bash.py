@@ -1,5 +1,6 @@
 #!/etc/ConsolePi/venv/bin/python3
 
+import shlex
 import sys
 
 sys.path.insert(0, '/etc/ConsolePi/src/pypkg')
@@ -24,9 +25,10 @@ def get_config(cfg=cfg):
         if isinstance(v, dict):
             continue  # currently only applies to remote_timeout
         elif isinstance(v, str):
-            print(f"{k}='{v}'")
+            # shlex.quote handles spaces, quotes, $ and backticks safely (output is sourced by bash)
+            print(f"{k}={shlex.quote(v)}")
         elif isinstance(v, list):
-            v = ' '.join(v)
+            v = ' '.join(shlex.quote(str(i)) for i in v)
             print(f'{k}=({v})')
         elif isinstance(v, bool):
             v = 'true' if v else 'false'

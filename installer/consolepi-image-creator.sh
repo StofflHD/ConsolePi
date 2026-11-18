@@ -534,7 +534,11 @@ do_import_configs() {
             EDIT=$input
         fi
         $EDIT && nano -ET2 $STAGED_CONFIG
-        cfg_ssid=$(grep '  wlan_ssid: ' $STAGED_CONFIG | awk '{print $2}')
+        # value may be quoted ('...' or "...") and contain spaces; strip quotes / trailing comment
+        cfg_ssid=$(sed -nE "s/^  wlan_ssid: *('(([^']|'')*)'|\"([^\"]*)\"|([^ #]*)).*/\2\4\5/p" "$STAGED_CONFIG" | head -1)
+        cfg_ssid=${cfg_ssid//\'\'/\'}
+        # only offer the SSID as hostname if it is a valid hostname
+        [[ "$cfg_ssid" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]] || cfg_ssid=
     fi
 
     # -- set hostname based on flag or based on pre-staged config if found

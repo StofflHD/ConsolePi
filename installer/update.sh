@@ -555,7 +555,7 @@ install_autohotspot_old() {
     fi
 
     logit "Create/Configure hostapd.conf"
-    convert_template hostapd.conf /etc/hostapd/hostapd.conf wlan_ssid=${wlan_ssid} wlan_psk=${wlan_psk} wlan_country=${wlan_country}
+    convert_template hostapd.conf /etc/hostapd/hostapd.conf "wlan_ssid=${wlan_ssid}" "wlan_psk=${wlan_psk}" "wlan_country=${wlan_country}"
     sudo chmod +r /etc/hostapd/hostapd.conf 2>> $log_file || logit "Failed to make hostapd.conf readable - verify after install" "WARNING"
 
     file_diff_update ${src_dir}hostapd /etc/default/hostapd
@@ -612,8 +612,8 @@ install_hotspot_nm() {
     local hotspot_con_file=/etc/NetworkManager/system-connections/hotspot.nmconnection
     [ -f /etc/sysctl.d/99-noipv6.conf ] && local v6_method=disabled || local v6_method=auto
 
-    convert_template hotspot.nmconnection "$hotspot_con_file" uuid=${uuid} wlan_iface=${wlan_iface:-wlan0} \
-        wlan_ssid=${wlan_ssid} wlan_psk=${wlan_psk} wlan_ip=${wlan_ip} v6_method=${v6_method}
+    convert_template hotspot.nmconnection "$hotspot_con_file" "uuid=${uuid}" "wlan_iface=${wlan_iface:-wlan0}" \
+        "wlan_ssid=${wlan_ssid}" "wlan_psk=${wlan_psk}" "wlan_ip=${wlan_ip}" "v6_method=${v6_method}"
 
     #verify
     if [ -f "$hotspot_con_file" ] && grep -q "address1=${wlan_ip}" $hotspot_con_file; then

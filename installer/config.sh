@@ -86,8 +86,8 @@ update_config() {
     spaces "local_domain: ${local_domain}" "# used to bypass VPN. evals domain sent via dhcp option if matches this var will not establish vpn" >> $yml_temp
     spaces "hotspot: ${hotspot}" "# wheather to enable AutoHotSpot Feature" >> $yml_temp
     spaces "wlan_ip: ${wlan_ip}" "# IP of ConsolePi when in hotspot mode" >> $yml_temp
-    spaces "wlan_ssid: ${wlan_ssid}" "# SSID used in hotspot mode" >> $yml_temp
-    spaces "wlan_psk: ${wlan_psk}" "# psk used for hotspot SSID" >> $yml_temp
+    spaces "wlan_ssid: $(yaml_squote "${wlan_ssid}")" "# SSID used in hotspot mode" >> $yml_temp
+    spaces "wlan_psk: $(yaml_squote "${wlan_psk}")" "# psk used for hotspot SSID" >> $yml_temp
     spaces "wlan_country: ${wlan_country}" "# regulatory domain for hotspot SSID" >> $yml_temp
     spaces "wired_dhcp: ${wired_dhcp}" "# Run dhcp on eth interface (after trying as client)" >> $yml_temp
     spaces "wired_ip: ${wired_ip}" "# Fallback IP for eth interface" >> $yml_temp
@@ -273,13 +273,13 @@ collect() {
             # -- HotSpot SSID --
             header
             prompt="What SSID do you want the HotSpot to Broadcast when in HotSpot mode"
-            user_input $wlan_ssid "${prompt}"
+            user_input "${wlan_ssid:-NUL}" "${prompt}"
             wlan_ssid=$result
 
             # -- HotSpot psk --
             header
             prompt="Enter the psk used for the HotSpot SSID"
-            user_input $wlan_psk "${prompt}"
+            user_input "${wlan_psk:-NUL}" "${prompt}"
             wlan_psk=$result
         fi
     fi
