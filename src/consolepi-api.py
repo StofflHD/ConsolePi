@@ -11,6 +11,7 @@ attached to the remotes).
 mdns and gdrive provide discovery/sync mechanisms, the API is used
 to ensure the remote is reachable and that the data is current.
 '''
+import hmac
 import sys
 
 import setproctitle
@@ -24,6 +25,7 @@ from fastapi import FastAPI  # NoQA
 # from pydantic import BaseModel  # NoQA
 from time import time  # NoQA
 from starlette.requests import Request  # NoQA
+from starlette.responses import JSONResponse  # NoQA
 
 install(show_locals=True)
 
@@ -100,6 +102,24 @@ app = FastAPI(title='ConsolePi.API',
               redoc_url="/api/redoc",
               openapi_url='/api/openapi/openapi.json'
               )
+
+
+LOOPBACK = ("127.0.0.1", "::1")
+
+
+def api_key_valid(provided: str, expected: str) -> bool:
+    return hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+
+
+@app.middleware("http")
+async def check_api_key(request: Request, call_next):
+    """Require X-API-Key header when api_key is set in OVERRIDES (requests from loopback are exempt)."""
+    if config.api_key:
+        client_ip = request.client.host if request.client else None
+        if client_ip not in LOOPBACK and not api_key_valid(request.headers.get("x-api-key", ""), config.api_key):
+            log.warning(f'[NEW API RQST IN] {client_ip} Rejected -- invalid or missing API key -- {request.url.path}')
+            return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
+    return await call_next(request)
 
 
 def log_request(request: Request, route: str):

@@ -214,7 +214,7 @@ do_pip_upgrade() {
     dots "Upgrade pip"
     sudo /etc/ConsolePi/venv/bin/python3 -m pip install --upgrade pip >>$log_file 2>&1 ; do_error $?
     dots "Upgrade ConsolePi Dependencies"
-    sudo /etc/ConsolePi/venv/bin/python3 -m pip install --upgrade -r ${req_file} >>$log_file 2>&1; do_error $?
+    sudo /etc/ConsolePi/venv/bin/python3 -m pip install --prefer-binary --upgrade -r ${req_file} >>$log_file 2>&1; do_error $?
 }
 
 line_dots() {

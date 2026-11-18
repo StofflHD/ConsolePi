@@ -35,7 +35,8 @@ class MDNS_Browser:
         self.d_discovered = []  # used when running as daemon (doesn't reset)
         self.no_adapters = []  # If both mdns and API report no adapters for remote add to list to prevent subsequent API calls
         self.startup_logged = False
-        self.zc = Zeroconf()
+        self.zc = None  # Zeroconf instance, created in run()
+        self.browser = None  # ServiceBrowser instance, created in run()
 
     def on_service_state_change(self,
                                 zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
@@ -162,12 +163,33 @@ class MDNS_Browser:
             cpi.remotes.data = cpi.remotes.update_local_cloud_file(remote_consoles=mdns_data)
             log.info(f'[MDNS DSCVRY] {hostname} Local Cache Updated after mdns discovery')
 
+    def stop_browser(self) -> None:
+        """Cancel the running ServiceBrowser and close its Zeroconf instance.
+
+        Both own background threads, so they must be shut down before a new
+        browser is started, otherwise every restart leaks threads (#233).
+        """
+        if self.browser is not None:
+            try:
+                self.browser.cancel()
+            except Exception as e:
+                log.warning(f'[MDNS BROWSE] {e.__class__.__name__} while cancelling browser: {e}')
+            self.browser = None
+        if self.zc is not None:
+            try:
+                self.zc.close()
+            except Exception as e:
+                log.warning(f'[MDNS BROWSE] {e.__class__.__name__} while closing zeroconf: {e}')
+            self.zc = None
+
     def run(self):
+        self.stop_browser()
         self.zc = Zeroconf()
         if not self.startup_logged:
             log.info(f"[MDNS DSCVRY] Discovering ConsolePis via mdns - Debug Enabled: {self.debug}")
             self.startup_logged = True
-        return ServiceBrowser(self.zc, "_consolepi._tcp.local.", handlers=[self.on_service_state_change])  # NoQA pylint: disable=unused-variable
+        self.browser = ServiceBrowser(self.zc, "_consolepi._tcp.local.", handlers=[self.on_service_state_change])
+        return self.browser
 
 
 if __name__ == '__main__':
@@ -196,9 +218,8 @@ if __name__ == '__main__':
             # re-init zeroconf browser every RESTART_INTERVAL seconds
             start = time.time()
             while time.time() < start + RESTART_INTERVAL:
-                time.sleep(start + RESTART_INTERVAL - time.time())
-            if mdns.zc is not None:
-                mdns.zc.close()
+                time.sleep(max(0, start + RESTART_INTERVAL - time.time()))
+            mdns.stop_browser()
 
             duration = f"{RESTART_INTERVAL / 60}m" if RESTART_INTERVAL > 60 else f"{RESTART_INTERVAL}s"
             mdns.discovered = []
@@ -206,5 +227,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     finally:
-        if mdns.zc is not None:
-            mdns.zc.close()
+        mdns.stop_browser()

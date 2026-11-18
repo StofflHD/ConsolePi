@@ -3,9 +3,9 @@
 import time
 import socket
 from typing import Any, Dict, List, Union
-from halo import Halo
+from consolepi.spinner import Spinner as Halo  # ASCII fallback on non UTF-8 terminals (#227)
 from sys import stdin
-from log_symbols import LogSymbols as log_sym  # Enum
+from consolepi.spinner import symbol as log_symbol
 from consolepi import utils, log, config, json  # type: ignore
 from aiohttp import ClientSession
 import asyncio
@@ -28,8 +28,8 @@ class Remotes:
         self.cpiexec = cpiexec
         self.pop_list = []
         self.old_api_log_sent = False
-        self.log_sym_warn = log_sym.WARNING.value
-        self.log_sym_error = log_sym.ERROR.value
+        self.log_sym_warn = log_symbol("warning")
+        self.log_sym_error = log_symbol("error")
         self.local = local
         self.connected: bool = False
         self.cache_update_pending = False
@@ -465,6 +465,8 @@ class Remotes:
             "Connection": "keep-alive",
             "cache-control": "no-cache",
         }
+        if config.api_key and config.api_key.isascii():
+            headers["X-API-Key"] = config.api_key
 
         ret = None
         try:
@@ -491,6 +493,11 @@ class Remotes:
                     except (json.decoder.JSONDecodeError, ContentTypeError):
                         log.error(f'[API RQST OUT] Puked on payload from {log_host} \n{await resp.text()}')
                         ret = resp.status
+                elif resp.status == 401:
+                    log.warning(
+                        f"[API RQST OUT] Remote ConsolePi: {log_host} rejected the request (401), "
+                        "api_key in OVERRIDES must match on all ConsolePis."
+                    )
         except (asyncio.TimeoutError, ClientConnectorError):
             log.warning(f"[API RQST OUT] Remote ConsolePi: {log_host} TimeOut when querying via API - Unreachable.")
         except Exception as e:

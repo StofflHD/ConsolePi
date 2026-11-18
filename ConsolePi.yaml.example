@@ -47,6 +47,7 @@ OVERRIDES:
   ovpn_share: false       # Set to true to allow hotspot traffic to egress via the tunnel (vs. just the wired interface)
   hide_legend: false      # Set to true to hide the legend by default in the menu, can still toggle it back on with 'TL'.
   api_port: 5000          # Change this to use a different API port (for this ConsolePi).
+  # api_key: "change-me"  # Optional. When set the API requires header X-API-Key: <key> (loopback exempt). ASCII only, must be the same on all ConsolePis.
 
 # ZTP (Zero Touch Provisioning) Allows you to leverage ConsolePi to automate the deployment of hardware from factory default.
 # Once the configuration and associated templates/variables are defined you must run `consolepi-ztp` to Generate the Configuration

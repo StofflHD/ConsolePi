@@ -6,7 +6,7 @@ import os
 import json
 import subprocess
 import shlex
-from halo import Halo
+from .spinner import Spinner as Halo  # ASCII fallback on non UTF-8 terminals (#227)
 
 from . import utils, log, config
 

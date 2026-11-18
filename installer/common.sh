@@ -294,7 +294,7 @@ user_input() {
     valid_result=false
     while ! $valid_result; do
         [ $pass -gt 0 ] && echo "Invalid Entry ${result}"
-        read -ep "${prompt}" result
+        read -rep "${prompt}" result
         if $bool; then
             result=${result,,}    # tolower
             if [ ${#result} -gt 0 ]; then        # If they enter text ensure it's y/n otherwise accept default
@@ -702,6 +702,12 @@ dots() {
     local pad=$(printf "%0.1s" "."{1..51})
     printf " %s%*.*s" "$1" 0 $((51-${#1})) "$pad" "$2"; echo
     return 0;
+}
+
+# Output $1 as a single-quoted YAML scalar so spaces, '#', ': ' etc. survive (embedded ' is doubled per YAML spec)
+yaml_squote() {
+    local v="$1"
+    printf "'%s'" "${v//\'/\'\'}"
 }
 
 spaces() {

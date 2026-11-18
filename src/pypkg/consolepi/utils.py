@@ -16,7 +16,7 @@ import json
 import threading
 import socket
 from io import StringIO
-from halo import Halo
+from consolepi.spinner import Spinner as Halo  # ASCII fallback on non UTF-8 terminals (#227)
 from typing import List, Dict
 
 try:
