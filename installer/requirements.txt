@@ -2,6 +2,7 @@
 # https://github.com/piwheels/packages/issues/530
 # This means more packages will be built during the install.  This is painfully slow for some packages on the Pi Zero
 # We have pinned what we can to avoid this pain for now, but can't get around all of it.  i.e. zeroconf will build, but takes forever.
+# Update 2026-11: piwheels builds again (cp311/cp313 wheels for armv6l/armv7l exist for cryptography, bcrypt, zeroconf, pydantic-core).
 dlipower>=1.0.176
 fastapi>=0.103.2
 google-api-python-client>=2.103.0
@@ -24,4 +25,8 @@ starlette>=0.27.0
 uvicorn>=0.23.2
 zeroconf>=0.115.2
 aiohttp>=3.10.11  # security vulnerability patched in 3.10.11
-cryptography<=42.0.8  # 43.0.3 build failed on piwheels
+# cryptography is used by paramiko / google-auth.  piwheels has armv6l/armv7l wheels (cp311 abi3) for current releases
+# again and PyPI has aarch64 wheels, so bookworm+ gets the security fixes.  Older python (bullseye) keeps the old floor,
+# --prefer-binary (installer) then picks the newest version that still has a wheel instead of building from source.
+cryptography>=46.0.6;python_version >= '3.11'  # 46.0.6 fixes name constraint verification (security)
+cryptography>=42.0.8;python_version < '3.11'
