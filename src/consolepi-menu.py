@@ -10,7 +10,7 @@ from os import system
 from pprint import pprint
 from collections import OrderedDict as od
 from typing import Union
-from halo import Halo
+from consolepi.spinner import Spinner as Halo  # ASCII fallback on non UTF-8 terminals (#227)
 import asyncio
 
 # --// ConsolePi imports \\--

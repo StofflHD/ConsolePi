@@ -3,9 +3,9 @@
 import time
 import socket
 from typing import Any, Dict, List, Union
-from halo import Halo
+from consolepi.spinner import Spinner as Halo  # ASCII fallback on non UTF-8 terminals (#227)
 from sys import stdin
-from log_symbols import LogSymbols as log_sym  # Enum
+from consolepi.spinner import symbol as log_symbol
 from consolepi import utils, log, config, json  # type: ignore
 from aiohttp import ClientSession
 import asyncio
@@ -28,8 +28,8 @@ class Remotes:
         self.cpiexec = cpiexec
         self.pop_list = []
         self.old_api_log_sent = False
-        self.log_sym_warn = log_sym.WARNING.value
-        self.log_sym_error = log_sym.ERROR.value
+        self.log_sym_warn = log_symbol("warning")
+        self.log_sym_error = log_symbol("error")
         self.local = local
         self.connected: bool = False
         self.cache_update_pending = False
