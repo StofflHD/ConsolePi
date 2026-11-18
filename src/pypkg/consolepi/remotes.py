@@ -465,6 +465,8 @@ class Remotes:
             "Connection": "keep-alive",
             "cache-control": "no-cache",
         }
+        if config.api_key and config.api_key.isascii():
+            headers["X-API-Key"] = config.api_key
 
         ret = None
         try:
@@ -491,6 +493,11 @@ class Remotes:
                     except (json.decoder.JSONDecodeError, ContentTypeError):
                         log.error(f'[API RQST OUT] Puked on payload from {log_host} \n{await resp.text()}')
                         ret = resp.status
+                elif resp.status == 401:
+                    log.warning(
+                        f"[API RQST OUT] Remote ConsolePi: {log_host} rejected the request (401), "
+                        "api_key in OVERRIDES must match on all ConsolePis."
+                    )
         except (asyncio.TimeoutError, ClientConnectorError):
             log.warning(f"[API RQST OUT] Remote ConsolePi: {log_host} TimeOut when querying via API - Unreachable.")
         except Exception as e:

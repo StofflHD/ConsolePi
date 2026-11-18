@@ -163,6 +163,11 @@ class Config():
         self.so_timeout = int(ovrd.get('smartoutlet_timeout', DEFAULT_SO_TIMEOUT))
         self.cycle_time = int(ovrd.get('cycle_time', DEFAULT_CYCLE_TIME))
         self.api_port = int(ovrd.get("api_port", DEFAULT_API_PORT))
+        # optional shared secret, when set the API requires header X-API-Key (use the same key on all ConsolePis)
+        self.api_key = str(ovrd.get("api_key") or "")
+        if self.api_key and not self.api_key.isascii():
+            # HTTP headers can't carry non-ASCII.  Keep the key set so the API still rejects remote requests (fail closed).
+            log.warning("api_key in OVERRIDES contains non-ASCII characters, use ASCII only.  Remote API access will fail.", show=True)
         self.hide_legend = ovrd.get("hide_legend", False)
         # Additional override settings not needed by the python files
         # ovpn_share:  Share VPN connection when wired_dhcp enabled with hotspot connected devices
