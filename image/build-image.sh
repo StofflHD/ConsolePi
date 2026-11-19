@@ -204,6 +204,10 @@ grep -q '^psk=NewHotspotPW' $T/etc/NetworkManager/system-connections/hotspot.nmc
 grep -q "wlan_psk: 'NewHotspotPW'" $T/etc/ConsolePi/ConsolePi.yaml
 grep -q 'Problems' $T/boot/firmware/consolepi-setup.done.txt && { cat $T/boot/firmware/consolepi-setup.done.txt; exit 1; }
 rm -rf $T
+# the menu's import block must load with the installed venv (regression: spinner import before sys.path)
+out=$(cd /tmp && /etc/ConsolePi/venv/bin/python -c "exec(open('/etc/ConsolePi/src/consolepi-menu.py').read().split('MIN_WIDTH = ')[0])" 2>&1 || true)
+echo "$out" | tail -5
+echo "$out" | grep -qE 'ModuleNotFoundError|ImportError' && { echo "consolepi-menu imports broken"; exit 1; }
 echo "smoke test OK"
 EOF
 
