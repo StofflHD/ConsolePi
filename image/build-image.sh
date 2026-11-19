@@ -159,12 +159,13 @@ chroot "$MNT" /usr/bin/env -i \
     HOME=/root TERM=dumb LANG=C.UTF-8 SUDO_USER=root DEBIAN_FRONTEND=noninteractive \
     CONSOLEPI_REPO="$CONSOLEPI_REPO" CONSOLEPI_FORCE_NM=true \
     /bin/bash /tmp/consolepi-installer/install.sh --silent --no-users \
-        -b "$CONSOLEPI_BRANCH" -p "$consolepi_pass" -H "$IMG_HOSTNAME" --tz "$TIMEZONE" -w "$WLAN_COUNTRY"
-rc=$?
+        -b "$CONSOLEPI_BRANCH" -p "$consolepi_pass" -H "$IMG_HOSTNAME" --tz "$TIMEZONE" -w "$WLAN_COUNTRY" \
+    2>&1 | tee "$WORK_DIR/installer-output.log"
 set -e
 unset consolepi_pass
 cp "$MNT/var/log/ConsolePi/install.log" "$OUT_DIR/install.log" 2>/dev/null || cp "$MNT/tmp/consolepi_install.log" "$OUT_DIR/install.log" 2>/dev/null || true
-[ $rc -eq 0 ] || die "installer failed (rc=$rc), see install.log"
+# the installer's exit code isn't meaningful (its last statement is `$silent && $do_reboot && ...`), check its result instead
+grep -q "Silent Install Complete" "$WORK_DIR/installer-output.log" || die "installer did not complete, see install.log"
 [ -x "$MNT/etc/ConsolePi/venv/bin/python3" ] || die "installer finished but ConsolePi venv is missing"
 
 # -- image specific adjustments ------------------------------------------------------------------
