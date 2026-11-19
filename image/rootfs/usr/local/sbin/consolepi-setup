@@ -5,7 +5,8 @@ Reads consolepi-setup.txt from the boot partition (editable on any PC after flas
 the AirConsole setup) and applies it before the Raspberry Pi OS user wizard and NetworkManager
 start:
 
-    user / password            login user (renames the default user, via RPi OS userconf.txt)
+    user / password            login user: first boot renames the default user (via RPi OS
+                               userconf.txt), later boots change the password (or rename uid 1000)
     wifi_ssid / wifi_password  WiFi to join as client
     wifi_country               WiFi regulatory domain (e.g. DE)
     hostname                   hostname
@@ -52,7 +53,9 @@ def run(cmd: list, stdin: str = None) -> str:
         if cmd[0] == "nmcli":
             return "[connection]\nid=dry-run\n"
         return ""
-    return subprocess.run(cmd, input=stdin, capture_output=True, text=True, check=True).stdout
+    # explicit UTF-8: under systemd the locale may be C/POSIX, which would mangle non-ASCII passwords
+    return subprocess.run(cmd, input=stdin, capture_output=True, text=True, encoding="utf-8",
+                          check=True).stdout
 
 
 def parse(text: str) -> dict:
@@ -76,6 +79,51 @@ def parse(text: str) -> dict:
     return cfg
 
 
+def decode(raw: bytes) -> str:
+    """Windows editors don't always save UTF-8.  Never silently replace characters: a replaced
+    character in a password gives a hash that matches nothing you can type."""
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        encodings = ["utf-16"]
+    else:
+        encodings = ["utf-8-sig", "cp1252"]
+    for enc in encodings:
+        try:
+            text = raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+        if enc == "cp1252":
+            summary.append("file encoding: Windows-1252 (not UTF-8), read as such")
+        return text
+    errors.append("file encoding not recognised, some characters were replaced - save it as UTF-8")
+    return raw.decode("utf-8", errors="replace")
+
+
+def password_info(password: str) -> str:
+    """Hints to spot typos / encoding problems without revealing the password."""
+    info = [f"{len(password)} characters"]
+    non_ascii = sorted({c for c in password if ord(c) > 127})
+    if non_ascii:
+        info.append(f"non-ASCII characters: {len(non_ascii)} different (umlauts etc. - "
+                    "mind the keyboard layout on the Pi's local console)")
+    if password != password.strip():
+        info.append("starts/ends with a space")
+    return ", ".join(info)
+
+
+def userconfig_pending() -> bool:
+    """True on the very first boot: RPi OS userconfig.service will still rename the default user."""
+    return os.path.lexists(ROOT / "etc/systemd/system/multi-user.target.wants/userconfig.service")
+
+
+def passwd_names() -> dict:
+    names = {}
+    for line in (ROOT / "etc/passwd").read_text().splitlines():
+        f = line.split(":")
+        if len(f) > 2:
+            names[f[0]] = f[2]
+    return names
+
+
 def apply_user(cfg: dict) -> None:
     user, password = cfg.get("user", "").lower(), cfg.get("password")
     if not user and not password:
@@ -87,8 +135,22 @@ def apply_user(cfg: dict) -> None:
         errors.append(f"invalid user name '{user}' (lower case letters, digits, '-', start with a letter)")
         return
     pw_hash = run(["openssl", "passwd", "-6", "-stdin"], stdin=password + "\n").strip()
-    (FW / "userconf.txt").write_text(f"{user}:{pw_hash}\n")  # picked up by userconfig.service (runs after us)
-    summary.append(f"user: {user} (password set)")
+    if userconfig_pending():
+        # first boot: picked up by userconfig.service (runs after us), renames the default user
+        (FW / "userconf.txt").write_text(f"{user}:{pw_hash}\n")
+        summary.append(f"user: {user} (password set: {password_info(password)})")
+        return
+    # later boots (e.g. forgotten password): set it directly
+    names = passwd_names()
+    if user in names:
+        run(["chpasswd", "-e"], stdin=f"{user}:{pw_hash}\n")
+        summary.append(f"user: {user} (password changed: {password_info(password)})")
+    elif "1000" in names.values():
+        old = next(n for n, uid in names.items() if uid == "1000")
+        run(["/usr/lib/userconf-pi/userconf", user, pw_hash])  # renames uid 1000 incl. home, sets password
+        summary.append(f"user: {old} renamed to {user} (password set: {password_info(password)})")
+    else:
+        errors.append(f"user '{user}' doesn't exist and there is no default user to rename")
 
 
 def apply_country(cfg: dict) -> None:
@@ -216,7 +278,7 @@ def apply_hotspot(cfg: dict) -> None:
 def main() -> int:
     if not CFG.exists():
         return 0
-    cfg = parse(CFG.read_text(encoding="utf-8-sig", errors="replace"))
+    cfg = parse(decode(CFG.read_bytes()))
     if not cfg:
         log("no settings in consolepi-setup.txt, nothing to do")
         return 0
@@ -232,7 +294,7 @@ def main() -> int:
     CFG.unlink()                                    # contains plain text passwords
     for line in report:
         log(line)
-    if not DRY_RUN:
+    if not DRY_RUN and hasattr(os, "sync"):
         os.sync()
     return 0
 

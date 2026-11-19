@@ -9,6 +9,10 @@
 #  Werte unten eintragen (das # am Zeilenanfang entfernen), speichern und den Pi
 #  starten.  Danach wird diese Datei geloescht (sie enthaelt Passwoerter).  Das
 #  Ergebnis steht in consolepi-setup.done.txt.
+#
+#  Later / spaeter: put this file back on the boot partition to change the password
+#  or add an ssh_key (e.g. when locked out) - Datei erneut anlegen, um z.B. das
+#  Passwort zurueckzusetzen.
 # ---------------------------------------------------------------------------------
 
 # Login user / Benutzer zum Anmelden (lower case / Kleinbuchstaben)

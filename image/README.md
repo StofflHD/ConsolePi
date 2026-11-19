@@ -43,6 +43,16 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
 The user gets all ConsolePi rights (groups `consolepi`, `dialout`, `sudo`). SSH is enabled.
 Without `user`/`password` the Pi asks for a user on the local console (keyboard + monitor).
 
+Notes:
+
+* Special characters and umlauts in passwords are fine. The file may be saved as UTF-8, UTF-16 or
+  Windows-1252 (ANSI). `consolepi-setup.done.txt` shows the password length so typos stand out.
+* The Pi's local console uses an English keyboard layout – on a German keyboard `y`/`z` and most
+  symbols are on different keys. SSH from your PC is not affected.
+* **Forgot the password / locked out?** Put a new `consolepi-setup.txt` with `user` + `password`
+  (or just `ssh_key`) on **bootfs** and boot: it is applied on every boot where the file exists, and
+  after the first boot the password of that user is changed directly.
+
 ## First boot
 
 * The file system grows to the full card and the SSH host keys are generated – give it a minute.

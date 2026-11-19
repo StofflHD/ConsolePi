@@ -181,7 +181,16 @@ log "Smoke test consolepi-setup"
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
 T=/tmp/setup-smoke
 mkdir -p $T/boot/firmware $T/etc/NetworkManager/system-connections $T/etc/ConsolePi $T/home/pi
+mkdir -p $T/etc/systemd/system/multi-user.target.wants
+touch $T/etc/systemd/system/multi-user.target.wants/userconfig.service   # = first boot
 cp /etc/passwd $T/etc/passwd
+# password with '!' and umlauts in a Windows-1252 file (what some Windows editors save)
+printf 'user=smoke\r\npassword=!Sm\xf6ke-p\xe4ss\r\n' > $T/boot/firmware/consolepi-setup.txt
+CONSOLEPI_SETUP_ROOT=$T /usr/local/sbin/consolepi-setup
+h=$(cut -d: -f2 $T/boot/firmware/userconf.txt)
+[ "$(printf '%s\n' '!Smöke-päss' | openssl passwd -6 -salt "$(echo "$h" | cut -d'$' -f3)" -stdin)" = "$h" ] || { echo "password hash mismatch"; exit 1; }
+grep -q 'Windows-1252' $T/boot/firmware/consolepi-setup.done.txt
+rm $T/boot/firmware/userconf.txt $T/boot/firmware/consolepi-setup.done.txt
 cp /etc/NetworkManager/system-connections/hotspot.nmconnection $T/etc/NetworkManager/system-connections/
 cp /etc/ConsolePi/ConsolePi.yaml $T/etc/ConsolePi/
 printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\n' > $T/boot/firmware/consolepi-setup.txt
