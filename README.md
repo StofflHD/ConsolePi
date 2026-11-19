@@ -76,7 +76,7 @@ wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/in
 
 # Changes in this fork
 
-Compared to upstream [Pack3tL0ss/ConsolePi](https://github.com/Pack3tL0ss/ConsolePi) (as of v2025-3.8).
+Compared to upstream [Pack3tL0ss/ConsolePi](https://github.com/Pack3tL0ss/ConsolePi) (as of v2026-3.11).
 Issue numbers refer to the upstream repository.
 
 ## New
