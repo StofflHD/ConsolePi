@@ -32,5 +32,5 @@ if $local_dev; then
         fi
     fi
 else
-    wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/$branch/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi "${ARGS[@]}" && rm /tmp/ConsolePi
+    wget -q https://raw.githubusercontent.com/${CONSOLEPI_REPO:-StofflHD/ConsolePi}/$branch/installer/install.sh -O /tmp/ConsolePi && sudo CONSOLEPI_REPO="${CONSOLEPI_REPO:-StofflHD/ConsolePi}" bash /tmp/ConsolePi "${ARGS[@]}" && rm /tmp/ConsolePi
 fi

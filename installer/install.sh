@@ -13,6 +13,10 @@
 # --    Sequence: install.sh (prep, common imports, git) --> config.sh (get configuration/user input) --> update.sh (perform install/updates)    -- #
 # --------------------------------------------------------------------------------------------------------------------------------------------------#
 
+# GitHub repo (owner/name) ConsolePi is installed from.  Override with: sudo CONSOLEPI_REPO=owner/name bash install.sh
+consolepi_repo="${CONSOLEPI_REPO:-StofflHD/ConsolePi}"
+export CONSOLEPI_REPO="$consolepi_repo"
+
 get_common() {
     if ! $local_dev ; then
         if [[ "$0" =~ install.sh ]] ; then
@@ -20,11 +24,11 @@ get_common() {
             [[ -f ${this_path}/common.sh ]] && cp ${this_path}/common.sh /tmp ||
             (
             echo "WARNING: This appeared to be an install from a pkg release, but common.sh not found in $this_path.  Attempting to fetch from GitHub Repo." ;
-            wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/${branch}/installer/common.sh -O /tmp/common.sh || echo "WARNING Failed to fetch common.sh from repo"
+            wget -q https://raw.githubusercontent.com/${consolepi_repo}/${branch}/installer/common.sh -O /tmp/common.sh || echo "WARNING Failed to fetch common.sh from repo"
             )
         else
             # install via TL;DR install line on GitHub
-            wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/${branch}/installer/common.sh -O /tmp/common.sh
+            wget -q https://raw.githubusercontent.com/${consolepi_repo}/${branch}/installer/common.sh -O /tmp/common.sh
         fi
     else
         if [ "${HOSTNAME,,}" != "consolepi-dev" ]; then
@@ -405,7 +409,7 @@ git_ConsolePi() {
         # -- ConsolePi dir does not exist clone from repo --
         logit "Clean Install git clone ConsolePi"
         pushd $home_dir >/dev/null
-        if git clone "${consolepi_source}" 1>/dev/null 2>> $log_file; then
+        if git clone ${branch:+-b "$branch"} "${consolepi_source}" 1>/dev/null 2>> $log_file; then
             logit "ConsolePi clone Success"
         else
             logit "Failed to Clone ConsolePi" "ERROR"
