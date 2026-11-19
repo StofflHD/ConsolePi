@@ -62,6 +62,18 @@ Notes:
 * Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
 * Run `consolepi-menu` to connect to a serial device.
 
+## Web terminal (browser access, like AirConsole)
+
+Open **`https://consolepi.local`** (or `https://10.110.0.1` on the hotspot, or the Pi's IP) in any
+browser – phone, tablet or laptop, no app needed. Log in with your user and password, and
+`consolepi-menu` opens right away. Leaving the menu gives you a normal shell; `exit` ends the session.
+
+* The certificate is self-signed (created on the Pi's first boot, unique per Pi), so the browser
+  warns once – accept it (*Advanced → Proceed*).
+* Same users and passwords as SSH; at most 5 sessions at the same time.
+* Turn it off: `sudo systemctl disable --now consolepi-web`
+* Built on [ttyd](https://github.com/tsl0922/ttyd) (`/usr/local/bin/ttyd`, service `consolepi-web`).
+
 Hostname `consolepi`, WiFi country `DE`, timezone `Europe/Berlin` (can be changed when running the workflow manually).
 
 ## Building yourself

@@ -35,7 +35,9 @@ HOTSPOT_SSID="${HOTSPOT_SSID:-ConsolePi}"
 HOTSPOT_PSK="${HOTSPOT_PSK:-ConsolePiR0cks!!}"
 OUT_DIR="$(realpath -m "${OUT_DIR:-./out}")"
 WORK_DIR="$(realpath -m "${WORK_DIR:-./work}")"
-EXTRA_MB=2048   # space added to the root fs for ConsolePi (venv, deps).  RPi OS grows the fs to the card on first boot.
+TTYD_VERSION=1.7.7
+TTYD_SHA256=b38acadd89d1d396a0f5649aa52c539edbad07f4bc7348b27b4f4b7219dd4165   # ttyd.aarch64 from the release's SHA256SUMS
+EXTRA_MB=2048  # space added to the root fs for ConsolePi (venv, deps).  RPi OS grows the fs to the card on first boot.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
@@ -175,6 +177,28 @@ install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-setup.service" 
 # CRLF so it opens fine in Windows notepad right after flashing
 sed 's/\r$//; s/$/\r/' "$SCRIPT_DIR/rootfs/boot/firmware/consolepi-setup.txt" > "$MNT/boot/firmware/consolepi-setup.txt"
 chroot "$MNT" systemctl enable consolepi-setup.service
+
+# -- web terminal (ttyd -> login -> consolepi-menu, https://<pi>/) --------------------------------
+# ttyd isn't packaged for bookworm/trixie: official static build, pinned + checksum verified
+log "Installing web terminal (ttyd ${TTYD_VERSION})"
+curl -sSLf -o "$WORK_DIR/ttyd" "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.aarch64"
+echo "${TTYD_SHA256}  $WORK_DIR/ttyd" | sha256sum -c - || die "checksum mismatch for ttyd"
+install -m 0755 "$WORK_DIR/ttyd" "$MNT/usr/local/bin/ttyd"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-cert" "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-login" "$MNT/usr/local/sbin/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-web.service" "$MNT/etc/systemd/system/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/profile.d/zz-consolepi-web.sh" "$MNT/etc/profile.d/"
+chroot "$MNT" systemctl enable consolepi-web.service
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+/usr/local/bin/ttyd --version
+T=$(mktemp -d)
+CONSOLEPI_WEB_DIR=$T/web /usr/local/sbin/consolepi-web-cert
+openssl x509 -in $T/web/cert.pem -noout -subject -ext subjectAltName
+test "$(stat -c %a $T/web/key.pem)" = 600
+rm -rf $T
+test ! -e /etc/consolepi-web    # must be created on the Pi, never shipped in the image
+bash -n /etc/profile.d/zz-consolepi-web.sh
+echo "web terminal OK"
+EOF
 
 # smoke test with the image's real nmcli/openssl against a scratch root (no wifi_country/hostname: they act on the live system)
 log "Smoke test consolepi-setup"
