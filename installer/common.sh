@@ -24,7 +24,10 @@ tmp_src="/tmp/consolepi-temp"
 warn_cnt=0
 INIT="$(ps --no-headers -o comm 1)"
 DEV_USER=${dev_user:-wade}  # User to use for ssh/sftp/git to local dev
-if [ "$(systemctl is-active NetworkManager.service)" == "active" ] && hash nmcli 2>/dev/null && [ $(nmcli -t dev | grep -v "p2p-dev\|:lo" | wc -l) -gt 0 ]; then
+if [ "${CONSOLEPI_FORCE_NM}" == "true" ]; then
+    # Image build (chroot): NetworkManager isn't running, but the target system uses it.  The NM setup is file based.
+    uses_nm=true
+elif [ "$(systemctl is-active NetworkManager.service)" == "active" ] && hash nmcli 2>/dev/null && [ $(nmcli -t dev | grep -v "p2p-dev\|:lo" | wc -l) -gt 0 ]; then
     uses_nm=true
 else
     uses_nm=false
@@ -66,7 +69,7 @@ $upgrade && log_file=$final_log || log_file=$tmp_log
 
 
 # -- External Sources --
-consolepi_source="https://github.com/Pack3tL0ss/ConsolePi.git"
+consolepi_source="https://github.com/${CONSOLEPI_REPO:-StofflHD/ConsolePi}.git"
 
 # header reqs 144 cols to display properly
 header() {

@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------------
+#  ConsolePi - first boot setup
+#
+#  Fill in the values below (remove the # in front of a line to use it), save the
+#  file and boot the Pi.  The settings are applied on first boot, then this file is
+#  deleted (it holds passwords).  The result is in consolepi-setup.done.txt.
+#
+#  ConsolePi - Einrichtung beim ersten Start
+#  Werte unten eintragen (das # am Zeilenanfang entfernen), speichern und den Pi
+#  starten.  Danach wird diese Datei geloescht (sie enthaelt Passwoerter).  Das
+#  Ergebnis steht in consolepi-setup.done.txt.
+#
+#  Later / spaeter: put this file back on the boot partition to change the password
+#  or add an ssh_key (e.g. when locked out) - Datei erneut anlegen, um z.B. das
+#  Passwort zurueckzusetzen.
+# ---------------------------------------------------------------------------------
+
+# Login user / Benutzer zum Anmelden (lower case / Kleinbuchstaben)
+#user=stefan
+#password=ChangeMe123
+
+# WiFi the Pi should join / WLAN, mit dem sich der Pi verbinden soll
+#wifi_ssid=My WiFi
+#wifi_password=my-wifi-password
+#wifi_country=DE
+
+# Optional
+#hostname=consolepi
+#ssh_key=ssh-ed25519 AAAA... me@pc
+
+# Fallback hotspot when no WiFi is in range / Hotspot, wenn kein WLAN erreichbar ist
+# default: SSID ConsolePi, password ConsolePiR0cks!!  - please change / bitte aendern
+#hotspot_ssid=ConsolePi
+#hotspot_password=my-hotspot-password

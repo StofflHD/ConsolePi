@@ -1,0 +1,19 @@
+[Unit]
+Description=ConsolePi web terminal (ttyd, https port 443)
+Documentation=https://github.com/StofflHD/ConsolePi/tree/master/image
+After=network.target consolepi-setup.service
+
+[Service]
+# self-signed certificate, generated on first start (unique per Pi)
+ExecStartPre=/usr/local/sbin/consolepi-web-cert
+# login with the normal Pi user, then consolepi-menu starts (see /etc/profile.d/zz-consolepi-web.sh)
+ExecStart=/usr/local/bin/ttyd --port 443 --ssl \
+    --ssl-cert /etc/consolepi-web/cert.pem --ssl-key /etc/consolepi-web/key.pem \
+    --writable --max-clients 5 \
+    -t titleFixed=ConsolePi -t disableLeaveAlert=true \
+    /usr/local/sbin/consolepi-web-login
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

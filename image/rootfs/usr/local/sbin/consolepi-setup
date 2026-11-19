@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""ConsolePi image first boot setup.
+
+Reads consolepi-setup.txt from the boot partition (editable on any PC after flashing, like
+the AirConsole setup) and applies it before the Raspberry Pi OS user wizard and NetworkManager
+start:
+
+    user / password            login user: first boot renames the default user (via RPi OS
+                               userconf.txt), later boots change the password (or rename uid 1000)
+    wifi_ssid / wifi_password  WiFi to join as client
+    wifi_country               WiFi regulatory domain (e.g. DE)
+    hostname                   hostname
+    ssh_key                    public key added to the user's authorized_keys
+    hotspot_ssid / hotspot_password   ConsolePi fallback hotspot
+
+The file holds plain text passwords, so it is deleted once applied.  A summary without secrets
+is left in consolepi-setup.done.txt.  Lines starting with # are ignored.
+
+CONSOLEPI_SETUP_ROOT (testing only) prefixes every path.
+"""
+import os
+import re
+import subprocess
+import sys
+import uuid
+from pathlib import Path
+
+ROOT = Path(os.environ.get("CONSOLEPI_SETUP_ROOT", "/"))
+FW = ROOT / "boot/firmware" if (ROOT / "boot/firmware").is_dir() else ROOT / "boot"
+CFG = FW / "consolepi-setup.txt"
+DONE = FW / "consolepi-setup.done.txt"
+NM_DIR = ROOT / "etc/NetworkManager/system-connections"
+HOTSPOT = NM_DIR / "hotspot.nmconnection"
+CONSOLEPI_YAML = ROOT / "etc/ConsolePi/ConsolePi.yaml"
+DRY_RUN = os.environ.get("CONSOLEPI_SETUP_DRY_RUN") == "1"  # testing: don't run system commands
+
+KEYS = {"user", "password", "wifi_ssid", "wifi_password", "wifi_country", "hostname", "ssh_key",
+        "hotspot_ssid", "hotspot_password"}
+
+summary: list = []
+errors: list = []
+
+
+def log(msg: str) -> None:
+    print(f"consolepi-setup: {msg}", flush=True)
+
+
+def run(cmd: list, stdin: str = None) -> str:
+    if DRY_RUN:
+        log(f"(dry-run) {' '.join(cmd)}")
+        if cmd[:2] == ["openssl", "passwd"]:
+            return "$6$dryrun$hash"
+        if cmd[0] == "nmcli":
+            return "[connection]\nid=dry-run\n"
+        return ""
+    # explicit UTF-8: under systemd the locale may be C/POSIX, which would mangle non-ASCII passwords
+    return subprocess.run(cmd, input=stdin, capture_output=True, text=True, encoding="utf-8",
+                          check=True).stdout
+
+
+def parse(text: str) -> dict:
+    cfg = {}
+    for n, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            errors.append(f"line {n}: missing '=' -> ignored")
+            continue
+        key, value = (s.strip() for s in line.split("=", 1))
+        key = key.lower()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        if key not in KEYS:
+            errors.append(f"line {n}: unknown setting '{key}' -> ignored")
+            continue
+        if value:
+            cfg[key] = value
+    return cfg
+
+
+def decode(raw: bytes) -> str:
+    """Windows editors don't always save UTF-8.  Never silently replace characters: a replaced
+    character in a password gives a hash that matches nothing you can type."""
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        encodings = ["utf-16"]
+    else:
+        encodings = ["utf-8-sig", "cp1252"]
+    for enc in encodings:
+        try:
+            text = raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+        if enc == "cp1252":
+            summary.append("file encoding: Windows-1252 (not UTF-8), read as such")
+        return text
+    errors.append("file encoding not recognised, some characters were replaced - save it as UTF-8")
+    return raw.decode("utf-8", errors="replace")
+
+
+def password_info(password: str) -> str:
+    """Hints to spot typos / encoding problems without revealing the password."""
+    info = [f"{len(password)} characters"]
+    non_ascii = sorted({c for c in password if ord(c) > 127})
+    if non_ascii:
+        info.append(f"non-ASCII characters: {len(non_ascii)} different (umlauts etc. - "
+                    "mind the keyboard layout on the Pi's local console)")
+    if password != password.strip():
+        info.append("starts/ends with a space")
+    return ", ".join(info)
+
+
+def userconfig_pending() -> bool:
+    """True on the very first boot: RPi OS userconfig.service will still rename the default user."""
+    return os.path.lexists(ROOT / "etc/systemd/system/multi-user.target.wants/userconfig.service")
+
+
+def passwd_names() -> dict:
+    names = {}
+    for line in (ROOT / "etc/passwd").read_text().splitlines():
+        f = line.split(":")
+        if len(f) > 2:
+            names[f[0]] = f[2]
+    return names
+
+
+def apply_user(cfg: dict) -> None:
+    user, password = cfg.get("user", "").lower(), cfg.get("password")
+    if not user and not password:
+        return
+    if not user or not password:
+        errors.append("user and password must both be set -> user not configured")
+        return
+    if not re.fullmatch(r"[a-z][a-z0-9-]{0,31}", user) or user == "root":
+        errors.append(f"invalid user name '{user}' (lower case letters, digits, '-', start with a letter)")
+        return
+    pw_hash = run(["openssl", "passwd", "-6", "-stdin"], stdin=password + "\n").strip()
+    if userconfig_pending():
+        # first boot: picked up by userconfig.service (runs after us), renames the default user
+        (FW / "userconf.txt").write_text(f"{user}:{pw_hash}\n")
+        summary.append(f"user: {user} (password set: {password_info(password)})")
+        return
+    # later boots (e.g. forgotten password): set it directly
+    names = passwd_names()
+    if user in names:
+        run(["chpasswd", "-e"], stdin=f"{user}:{pw_hash}\n")
+        summary.append(f"user: {user} (password changed: {password_info(password)})")
+    elif "1000" in names.values():
+        old = next(n for n, uid in names.items() if uid == "1000")
+        run(["/usr/lib/userconf-pi/userconf", user, pw_hash])  # renames uid 1000 incl. home, sets password
+        summary.append(f"user: {old} renamed to {user} (password set: {password_info(password)})")
+    else:
+        errors.append(f"user '{user}' doesn't exist and there is no default user to rename")
+
+
+def apply_country(cfg: dict) -> None:
+    country = cfg.get("wifi_country", "").upper()
+    if not country:
+        return
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        errors.append(f"invalid wifi_country '{country}' (2 letters, e.g. DE)")
+        return
+    run(["raspi-config", "nonint", "do_wifi_country", country])
+    if CONSOLEPI_YAML.exists():
+        set_yaml(CONSOLEPI_YAML, "wlan_country", country, quote=False)
+    summary.append(f"wifi_country: {country}")
+
+
+def apply_wifi(cfg: dict) -> None:
+    ssid, psk = cfg.get("wifi_ssid"), cfg.get("wifi_password", "")
+    if not ssid:
+        return
+    if psk and not 8 <= len(psk) <= 63:
+        errors.append("wifi_password must be 8-63 characters -> WiFi not configured")
+        return
+    cmd = ["nmcli", "--offline", "connection", "add", "type", "wifi", "con-name", ssid, "ssid", ssid,
+           "connection.uuid", str(uuid.uuid4()), "connection.autoconnect", "yes",
+           "connection.autoconnect-priority", "10"]   # hotspot has -999, so a client WiFi always wins
+    if psk:
+        cmd += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", psk]
+    keyfile = run(cmd)
+    NM_DIR.mkdir(parents=True, exist_ok=True)
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", ssid)
+    dst = NM_DIR / f"wifi-{name}.nmconnection"
+    dst.write_text(keyfile)
+    os.chmod(dst, 0o600)
+    summary.append(f"wifi: {ssid}")
+
+
+def apply_hostname(cfg: dict) -> None:
+    host = cfg.get("hostname")
+    if not host:
+        return
+    if not re.fullmatch(r"[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?", host):
+        errors.append(f"invalid hostname '{host}'")
+        return
+    (ROOT / "etc/hostname").write_text(host + "\n")
+    hosts = ROOT / "etc/hosts"
+    lines = hosts.read_text().splitlines() if hosts.exists() else []
+    lines = [ln for ln in lines if not ln.startswith("127.0.1.1")] + [f"127.0.1.1\t{host}"]
+    hosts.write_text("\n".join(lines) + "\n")
+    run(["hostname", host])  # systemd already read /etc/hostname at early boot
+    summary.append(f"hostname: {host}")
+
+
+def apply_ssh_key(cfg: dict) -> None:
+    key = cfg.get("ssh_key")
+    if not key:
+        return
+    if not re.match(r"^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp\d+|sk-\S+) [A-Za-z0-9+/=]+", key):
+        errors.append("ssh_key doesn't look like a public key (ssh-ed25519 AAAA...)")
+        return
+    # home of the default user (uid 1000); it is moved along when userconfig renames the user
+    home, uid, gid = ROOT / "home/pi", 1000, 1000
+    for line in (ROOT / "etc/passwd").read_text().splitlines():
+        f = line.split(":")
+        if len(f) > 5 and f[2] == "1000":
+            home, uid, gid = ROOT / f[5].lstrip("/"), int(f[2]), int(f[3])
+    ssh_dir = home / ".ssh"
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    auth = ssh_dir / "authorized_keys"
+    existing = auth.read_text() if auth.exists() else ""
+    if key not in existing:
+        auth.write_text(existing + ("" if not existing or existing.endswith("\n") else "\n") + key + "\n")
+    os.chmod(ssh_dir, 0o700)
+    os.chmod(auth, 0o600)
+    if not DRY_RUN:
+        for p in (ssh_dir, auth):
+            os.chown(p, uid, gid)
+    summary.append("ssh_key: added")
+
+
+def yaml_squote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def set_yaml(path: Path, key: str, value: str, quote: bool = True) -> None:
+    text = path.read_text()
+    new = f"  {key}: {yaml_squote(value) if quote else value}"
+    text, n = re.subn(rf"(?m)^  {key}:.*$", lambda _: new, text)
+    if n:
+        path.write_text(text)
+
+
+def set_keyfile(path: Path, section: str, key: str, value: str) -> None:
+    out, cur = [], None
+    for line in path.read_text().splitlines():
+        if line.startswith("["):
+            cur = line.strip("[]")
+        elif cur == section and line.startswith(f"{key}="):
+            line = f"{key}={value}"
+        out.append(line)
+    path.write_text("\n".join(out) + "\n")
+
+
+def apply_hotspot(cfg: dict) -> None:
+    ssid, psk = cfg.get("hotspot_ssid"), cfg.get("hotspot_password")
+    if psk and not 8 <= len(psk) <= 63:
+        errors.append("hotspot_password must be 8-63 characters -> hotspot password unchanged")
+        psk = None
+    if not (ssid or psk):
+        return
+    if not HOTSPOT.exists():
+        errors.append("hotspot profile not found -> hotspot unchanged")
+        return
+    if ssid:
+        set_keyfile(HOTSPOT, "wifi", "ssid", ssid)
+        if CONSOLEPI_YAML.exists():
+            set_yaml(CONSOLEPI_YAML, "wlan_ssid", ssid)
+        summary.append(f"hotspot_ssid: {ssid}")
+    if psk:
+        set_keyfile(HOTSPOT, "wifi-security", "psk", psk)
+        if CONSOLEPI_YAML.exists():
+            set_yaml(CONSOLEPI_YAML, "wlan_psk", psk)
+        summary.append("hotspot_password: changed")
+
+
+def main() -> int:
+    if not CFG.exists():
+        return 0
+    cfg = parse(decode(CFG.read_bytes()))
+    if not cfg:
+        log("no settings in consolepi-setup.txt, nothing to do")
+        return 0
+    for step in (apply_user, apply_country, apply_wifi, apply_hostname, apply_ssh_key, apply_hotspot):
+        try:
+            step(cfg)
+        except Exception as e:  # keep going, one bad setting shouldn't block the rest
+            errors.append(f"{step.__name__}: {e.__class__.__name__}: {e}")
+    report = ["ConsolePi first boot setup", ""] + (summary or ["nothing applied"])
+    if errors:
+        report += ["", "Problems:"] + [f"  - {e}" for e in errors]
+    DONE.write_bytes(("\r\n".join(report) + "\r\n").encode())   # CRLF: readable in Windows notepad
+    CFG.unlink()                                    # contains plain text passwords
+    for line in report:
+        log(line)
+    if not DRY_RUN and hasattr(os, "sync"):
+        os.sync()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

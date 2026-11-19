@@ -1,0 +1,101 @@
+name: Build ConsolePi OS image
+
+# Builds a Raspberry Pi OS Lite (arm64) image with ConsolePi pre-installed.
+#  - manually: Actions tab -> "Build ConsolePi OS image" -> Run workflow  (image is attached to the run as artifact)
+#  - on tag image-v*: additionally publishes a GitHub release with the image
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Raspberry Pi OS base"
+        type: choice
+        options: [bookworm, trixie]
+        default: bookworm
+      wlan_country:
+        description: "WiFi country code"
+        default: DE
+      timezone:
+        description: "Timezone"
+        default: Europe/Berlin
+  push:
+    tags: ["image-v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq parted zerofree xz-utils e2fsprogs curl
+
+      - name: Build image
+        env:
+          BASE: ${{ inputs.base || 'bookworm' }}
+          WLAN_COUNTRY: ${{ inputs.wlan_country || 'DE' }}
+          TIMEZONE: ${{ inputs.timezone || 'Europe/Berlin' }}
+          CONSOLEPI_REPO: ${{ github.repository }}
+          CONSOLEPI_BRANCH: ${{ github.ref_type == 'branch' && github.ref_name || github.event.repository.default_branch }}
+        run: |
+          if [ "$BASE" = "trixie" ]; then
+            export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_arm64_latest
+          else
+            export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64_latest
+          fi
+          sudo --preserve-env=BASE_IMAGE_URL,WLAN_COUNTRY,TIMEZONE,CONSOLEPI_REPO,CONSOLEPI_BRANCH \
+            OUT_DIR="$RUNNER_TEMP/out" WORK_DIR="$RUNNER_TEMP/work" bash image/build-image.sh
+
+      - name: Upload install log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-log
+          path: |
+            ${{ runner.temp }}/out/install.log
+            ${{ runner.temp }}/out/build-info.txt
+          if-no-files-found: ignore
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolepi-image
+          path: |
+            ${{ runner.temp }}/out/*.img.xz
+            ${{ runner.temp }}/out/*.sha256
+          compression-level: 0   # already xz compressed
+          retention-days: 14
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/image-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$RUNNER_TEMP/out"
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "ConsolePi Image $GITHUB_REF_NAME" \
+            --notes-file <(cat <<EOF
+          Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed – Pi Zero 2 W, 3B/3B+, 4, 400, 5.
+
+          **Quick start**
+          1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
+          2. Re-plug the card, edit \`consolepi-setup.txt\` on the **bootfs** drive (user, password, WiFi), save.
+          3. Boot, then open \`https://consolepi.local\` in a browser or \`ssh <user>@consolepi.local\`.
+             No WiFi in range: hotspot \`ConsolePi\` → \`https://10.110.0.1\`.
+
+          Full guide: [image/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/image/README.md)
+
+          \`\`\`
+          $(cat build-info.txt)
+          \`\`\`
+          EOF
+            ) \
+            ./*.img.xz ./*.sha256

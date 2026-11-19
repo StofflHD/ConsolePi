@@ -1,0 +1,17 @@
+#!/bin/sh
+# Self-signed certificate for the ConsolePi web terminal, created once per Pi (not in the image,
+# so every Pi has its own key).  Delete /etc/consolepi-web to get a new one (e.g. after a
+# hostname change).  CONSOLEPI_WEB_DIR is for testing only.
+set -e
+d="${CONSOLEPI_WEB_DIR:-/etc/consolepi-web}"
+[ -s "$d/cert.pem" ] && [ -s "$d/key.pem" ] && exit 0
+mkdir -p "$d"
+chmod 700 "$d"
+h=$(hostname)
+ip=$(sed -n "s/^ *wlan_ip: *['\"]\{0,1\}\([0-9.]*\).*/\1/p" /etc/ConsolePi/ConsolePi.yaml 2>/dev/null | head -n1)
+san="DNS:$h,DNS:$h.local,IP:${ip:-10.110.0.1}"
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
+    -subj "/CN=$h" -addext "subjectAltName=$san" \
+    -keyout "$d/key.pem" -out "$d/cert.pem" 2>/dev/null
+chmod 600 "$d/key.pem"
+echo "consolepi-web-cert: created certificate for $san"

@@ -1,0 +1,5 @@
+#!/bin/sh
+# started by ttyd for every browser session: normal system login (PAM, same users/passwords as
+# SSH), the marker makes /etc/profile.d/zz-consolepi-web.sh open consolepi-menu after login
+export CONSOLEPI_WEB=1
+exec /bin/login -p
