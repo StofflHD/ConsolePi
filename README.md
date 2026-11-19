@@ -2,14 +2,20 @@
 
 Acts as a serial Console Server, allowing you to remotely connect to ConsolePi via Telnet/SSH/bluetooth to gain Console Access to devices connected to local **or remote** ConsolePis via USB to serial adapters (i.e. Switches, Routers, Access Points... anything with a serial port).
 
+> **This is a fork of [Pack3tL0ss/ConsolePi](https://github.com/Pack3tL0ss/ConsolePi)** with bug fixes, a
+> ready-to-flash OS image and a browser based terminal. See [Changes in this fork](#changes-in-this-fork).
+
 ***TL;DR:***
-Single Command Install Script. Run from an internet connected RaspberryPi running RaspiOS (ideally a fresh image).  *See [Known Issues](#known-issues) regarding changes in Raspberry Pi OS 12(bookworm).*
+Easiest: flash the [**ready-made OS image**](image/README.md) (Releases → `image-v*`), fill in
+`consolepi-setup.txt` on the card, boot – done.
+
+Or the single command install script. Run from an internet connected RaspberryPi running RaspiOS (ideally a fresh image).  *See [Known Issues](#known-issues) regarding changes in Raspberry Pi OS 12(bookworm).*
 
 ```bash
-wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi && sudo rm -f /tmp/ConsolePi
+wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi && sudo rm -f /tmp/ConsolePi
 ```
 
-![consolepi animated Demo](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/main-demo.gif)
+![consolepi animated Demo](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/main-demo.gif)
 
 
 >*Making multiple ConsolePis?  Want to re-image, but pull-over all of your existing configs?  Check out the [image creator](#3-consolepi-image-creator)!!!*
@@ -17,6 +23,7 @@ wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/
 ------
 <!-- prettier-ignore-start -->
 # Contents
+- [Changes in this fork](#changes-in-this-fork)
 - [Known Issues](#known-issues)
 - [What's New](#whats-new)
 - [Planned Enhancements](#planned-enhancements)
@@ -65,6 +72,39 @@ wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/
 - [Credits](#credits)
 <!-- prettier-ignore-end -->
 ------
+
+
+# Changes in this fork
+
+Compared to upstream [Pack3tL0ss/ConsolePi](https://github.com/Pack3tL0ss/ConsolePi) (as of v2025-3.8).
+Issue numbers refer to the upstream repository.
+
+## New
+
+| Feature | Details |
+|---|---|
+| **Ready-to-flash OS image** | Raspberry Pi OS Lite 64 bit (Bookworm) with ConsolePi pre-installed, built by GitHub Actions (`.github/workflows/build-image.yml`, `image/build-image.sh`). Runs on Pi Zero 2 W, 3B/3B+, 4, 400, 5. Download from the releases (`image-v*`). Details: [image/README.md](image/README.md) |
+| **`consolepi-setup.txt`** | Raspberry Pi Imager offers no OS customisation for custom images, so the image brings its own: after flashing, edit `consolepi-setup.txt` on the boot partition (user, password, WiFi, country, hostname, SSH key, hotspot SSID/password). Applied on boot, then deleted; result in `consolepi-setup.done.txt`. Works on later boots too (e.g. password reset). Accepts UTF-8, UTF-16 and Windows-1252 files |
+| **Web terminal** (image) | `https://consolepi.local` in any browser → system login → `consolepi-menu`, similar to AirConsole. [ttyd](https://github.com/tsl0922/ttyd), self-signed certificate generated per Pi, service `consolepi-web` |
+| **Optional API key** | Set `api_key` in the `OVERRIDES` section of `ConsolePi.yaml` (same key on all cluster members). Requests then need the `X-API-Key` header (HTTP 401 otherwise); localhost is exempt. See [ConsolePi API](#consolepi-api) |
+
+## Fixes
+
+| Fix | Details |
+|---|---|
+| mDNS browser thread leak ([#233](https://github.com/Pack3tL0ss/ConsolePi/issues/233)) | `consolepi-mdnsbrowse` created a new Zeroconf instance on every restart without closing the old one; threads/sockets piled up |
+| Hotspot SSID/PSK with spaces or special characters ([#210](https://github.com/Pack3tL0ss/ConsolePi/issues/210)) | Values are quoted in the installer, written as quoted YAML and passed shell-safe to bash (`shlex.quote`) |
+| Menu on non UTF-8 terminals ([#227](https://github.com/Pack3tL0ss/ConsolePi/issues/227)) | Spinner falls back to ASCII frames and `[OK]`/`[X]` symbols instead of garbled output / encoding errors |
+| Dependencies | `cryptography` floor raised on Python ≥ 3.11 (security fixes); unused `requirements-full.txt` removed; `consolepi-sync` prefers binary wheels (no compiling on a Pi Zero) |
+
+## Installer
+
+* Installs from this fork by default. Another repo can be used with `CONSOLEPI_REPO=owner/name`
+  (also passed on by `consolepi-upgrade`).
+* `CONSOLEPI_FORCE_NM=true` forces the NetworkManager code path (used for the image build, where
+  NetworkManager isn't running in the chroot).
+
+Upstream remote for syncing: `git remote add upstream https://github.com/Pack3tL0ss/ConsolePi.git`
 
 
 # Known Issues
@@ -146,7 +186,7 @@ Prior Changes can be found in the - [ChangeLog](changelog.md)
 
 # Features
 ## **Feature Summary Image**
-![consolepi-menu image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ConsolePi_features.jpg)
+![consolepi-menu image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ConsolePi_features.jpg)
 
 ## Serial Console Server
 **This is the core feature of ConsolePi.**
@@ -190,11 +230,11 @@ When an interface receives an IP address ConsolePi will Automatically connect to
 
 When ConsolePi receives a dynamic IP address.  A message is sent via PushBullet API with the IP so you know how to reach ConsolePi.
 
-![Push Bullet Notification image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ConsolePiPB1.png)
+![Push Bullet Notification image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ConsolePiPB1.png)
 
 An additional message is sent once a tunnel is established if the Automatic VPN feature is enabled.
 
-![Push Bullet Notification image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ConsolePiPB2.png)
+![Push Bullet Notification image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ConsolePiPB2.png)
 
 Each Time a Notification is triggered **all** interface IPs are sent in the message along with the ConsolePi's default gateway(s).
 
@@ -211,18 +251,18 @@ This function also:
 - Optionally, with `ovpn_share: true` set in the optional `OVERRIDES:` section of ConsolePi.yaml wired devices will share access to the OpenVPN tunnel if established (via Auto-OpenVPN).
   > NAT & ovpn_share override with the new NetworkManager based automations has not been tested.  iptables is not installed with Raspberry Pi OS 12 (bookworm)
 
-> The [ZTP Orchestration](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ztp.md) feature will enable wired fallback to static/DHCP Server when you run `consolepi-ztp`.  `consolepi-ztp -end` restores everything to pre-ZTP state.  You do not need to enable it if ZTP is your only need for it `consolepi-ztp` will handle that.
+> The [ZTP Orchestration](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ztp.md) feature will enable wired fallback to static/DHCP Server when you run `consolepi-ztp`.  `consolepi-ztp -end` restores everything to pre-ZTP state.  You do not need to enable it if ZTP is your only need for it `consolepi-ztp` will handle that.
 
 ## ConsolePi Cluster / Cloud Sync
 
 The Cluster feature allows you to have multiple ConsolePis connected to the network, or to each other (i.e. first ConsolePi in hotspot mode, the others connected as clients to that hotspot).  A connection to any one of the ConsolePis in the Cluster will provide options to connect to any local serial adapters, as well as those connected to the other ConsolePis in the cluster (via the `consolepi-menu` command).
 
 
-![consolepi-menu image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/consolepi-use-diagram.jpg)
+![consolepi-menu image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/consolepi-use-diagram.jpg)
 
 **Another look at the menu**
 
-![consolepi-menu image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/menu.png)
+![consolepi-menu image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/menu.png)
 
 > In this example only 1 adapter is connected locally (menu item 1), Items 2 - 26 are adapters discovered on other ConsolePis on the network. Items 27 - 50 are [Manual Host Entries](configuring-manual-host-entries).
 
@@ -230,7 +270,7 @@ The Cluster feature allows you to have multiple ConsolePis connected to the netw
 ### Supported Cluster Sync Methods:
 
 #### Google Drive:
-   > Read The [Google Drive Setup](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/gdrive.md) for instructions on setting up Google Drive and authorizing ConsolePi to leverage the API.
+   > Read The [Google Drive Setup](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/gdrive.md) for instructions on setting up Google Drive and authorizing ConsolePi to leverage the API.
  - Google Drive/Google Sheets is currently the only external method supported.  Given this gets the job done, it unlikely more external methods will be added.
 
  - The ConsolePi will automatically exchange information with `ConsolePi.csv` in your gdrive under the following scenarios (*all assume the function is enabled in the config*):
@@ -263,7 +303,7 @@ The Cluster feature allows you to have multiple ConsolePis connected to the netw
  - `consolepi-menu` does not attempt to connect to the cloud on launch, it retrieves remote data from the local cache file only, verifies the devices are reachable, and if so adds them to the menu.  To trigger a cloud update use the `r` refresh option.
   >Note: that ConsolePi will automatically update the local cache file when it gets an IP address, or adapters are added/removed, so the refresh should only be necessary if other ConsolePis have come online since the the menu was launched.  Additionally ConsolePis will automatically discover each other via mdns if on the same network, this will automatically update the local-cache if a new remote ConsolePi is discovered.
 
- - Read The [Google Drive Setup](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/gdrive.md) for instructions on setting up Google Drive and authorizing ConsolePi to leverage the API.
+ - Read The [Google Drive Setup](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/gdrive.md) for instructions on setting up Google Drive and authorizing ConsolePi to leverage the API.
 
    #### If you are configuring multiple ConsolePis to use this cluster, you should consider using the [ConsolePi Image Creator](#3.-consolepi-image-creator).  Once You've installed the first ConsolePi, leverage the `consolepi-image` command to pre-stage the micro-sd cards for the other ConsolePis you will be creating.  This script is handy, if duplicating the install across multiple ConsolePis.  It can pre-stage the entire configuration and cut out some install time.
 
@@ -284,13 +324,13 @@ The Power Control Function allows you to control power to external outlets.  Con
 ### The Power Control Menu
 *Defined Outlets will show up in the Power Menu*
 
-![consolepi-menu image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master//readme_content/powermenu.png)
+![consolepi-menu image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master//readme_content/powermenu.png)
 
 
 ### Additional Controls for Digital Loggers
 *You may have an 8 port digital-loggers web power switch, with only some of those ports linked to devices.  Any Outlets linked to devices will show up in the Power Menu, **All** of the Ports for the DLI (regardless of linkage) will show up in the dli menu*
 
-![consolepi-menu image](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master//readme_content/dlimenu.png)
+![consolepi-menu image](https://raw.githubusercontent.com/StofflHD/ConsolePi/master//readme_content/dlimenu.png)
 
 ### Outlet Linkages
 
@@ -305,7 +345,7 @@ Connecting To r2-6200T-sw...
 picocom v3.1
 ...
 ```
-Refer to [Power Control Setup](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/power.md) for details on how to setup Power Control.
+Refer to [Power Control Setup](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/power.md) for details on how to setup Power Control.
 
 ## Manual Host Entries
 The Manual Host Entries Feature allows you to manually define other SSH or TELNET endpoints that you want to appear in the menu.  These entries will appear in the `rs` (remote shell) menu by default, but can also show-up in the main menu if `show_in_main: true`.  Manual host entries support outlet bindings (Auto Power On when connecting through the menu).
@@ -314,7 +354,7 @@ Refer to [Manual Host Entries](#configuring-manual-host-entries) in the Configur
 
 ## ZTP Orchestration
 
-ConsolePi supports Zero Touch Provisioning(ZTP) of devices via wired ethernet/DHCP.  The feature uses DHCP to trigger ZTP, and supports config file generation using jinja2 templates.  For more details see [`ConsolePi ZTP Orchestration`](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ztp.md).
+ConsolePi supports Zero Touch Provisioning(ZTP) of devices via wired ethernet/DHCP.  The feature uses DHCP to trigger ZTP, and supports config file generation using jinja2 templates.  For more details see [`ConsolePi ZTP Orchestration`](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ztp.md).
 
 ## ConsolePi API
 
@@ -331,12 +371,15 @@ The swagger interface is @ `/api/docs` or `/api/redoc`.  You can browse/try the 
 
 The API is used by ConsolePi to verify reachability and ensure adapter data is current on menu-load.
 
-> The API is currently unsecured, it uses http, and Auth is not implemented *yet*.  It currently only supports GET requests and doesn't provide any sensitive (credential) data.
+> The API uses plain http and only supports GET requests; it doesn't provide any sensitive (credential) data.
+> *(this fork)* Access can be restricted with an API key: set `api_key: <ascii-key>` in the `OVERRIDES`
+> stanza of `ConsolePi.yaml` on every ConsolePi of a cluster. Clients then have to send the
+> `X-API-Key` header, otherwise the API answers 401. Requests from localhost are always allowed.
 
 ## ConsolePi Extras
 Toward the end of the install, and via `consolepi-extras` anytime after the install, you are provided with options to automate the deployment (and removal for most) of some additional tools.  This is a selection of tools not required for ConsolePi, but often desired, or useful for the kind of folks that would be using ConsolePi.
 
-![`consolepi-extras`](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/consolepi-extras.png)
+![`consolepi-extras`](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/consolepi-extras.png)
 
 >Note: speed test (locally hosted browser based speed-test (server)), is only presented as an option for Pi4/CM4+.  Devices prior had a slow ethernet port, so it wouldn't make sense to use them as a speed-test server.
 
@@ -399,12 +442,12 @@ Install RaspberryPi OS on a raspberryPi and connect it to the network.
 Use the command string below to kick-off the automated installer.  The install script is designed to be essentially turn-key.  It will prompt to change hostname, set timezone, and set the consolepi users password.  Be sure to checkout the [image creator script](#3-consolepi-image-creator) if doing a headless install, creating multiple ConsolePis, or want to re-image an existing ConsolePi.
 
 ```
-wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi && sudo rm -f /tmp/ConsolePi
+wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi && sudo rm -f /tmp/ConsolePi
 ```
 
 >Command String Breakdown:
 >
->`wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi` --> Pull current install script from GitHub and place in /tmp/ConsolePi
+>`wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi` --> Pull current install script from GitHub and place in /tmp/ConsolePi
 >
 > `sudo bash /tmp/ConsolePi` --> Execute ConsolePi install script with sudo privs
 >
@@ -417,7 +460,7 @@ A Silent install (Installation runs without prompts) is possible cmd line argume
 
 Refer to [/etc/ConsolePi/installer/install.conf.example](installer/install.conf.example) for an example config.  This command string will download it to your home dir as install.conf and open it in nano for editing.
 ```
-wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/install.conf.example -O ~/install.conf && nano ~/install.conf
+wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/install.conf.example -O ~/install.conf && nano ~/install.conf
 ```
 
 > The output below shows `consolepi-upgrade` as the command to launch, the command will be `consolepi-install` on an image created using the [image creator script](#3-consolepi-image-creator).  If neither is the case you would call the installer directly (with sudo) and pass in the args (The [TL;DR](#consolepi) string at the top of this README can be modified to pass in the arguments)
@@ -466,12 +509,12 @@ Alternatively you can clone this repository to /etc manually, then run the insta
 
 ```
 cd /etc
-sudo git clone https://github.com/Pack3tL0ss/ConsolePi.git
+sudo git clone https://github.com/StofflHD/ConsolePi.git
 
 - or -
 
 cd /tmp
-git clone https://github.com/Pack3tL0ss/ConsolePi.git
+git clone https://github.com/StofflHD/ConsolePi.git
 sudo mv /tmp/ConsolePi /etc
 ```
 
@@ -509,10 +552,10 @@ From an Existing ConsolePi:
 **OR**
 
 Using a Linux System (Most distros should work only requirement is a bash shell ... tested on RaspiOS and Mint) enter the following command:
-- `curl -JLO https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/consolepi-image-creator.sh  && sudo chmod +x consolepi-image-creator.sh`
+- `curl -JLO https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/consolepi-image-creator.sh  && sudo chmod +x consolepi-image-creator.sh`
 - That will download the image creator and make it executable.
 - The image creator supports both command line arguments and a configuration file (where the same settings configurable as cmd line arguments can be configured in file... handy for re-use).
-- `curl -JLO https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/consolepi-image-creator.conf` To get the optional conf file for the image creator.  The config file will be automatically imported if it's in cwd (current working directory).
+- `curl -JLO https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/consolepi-image-creator.conf` To get the optional conf file for the image creator.  The config file will be automatically imported if it's in cwd (current working directory).
 
 ### ConsolePi_image_creator brief summary:
 
@@ -676,7 +719,7 @@ The Use Cases
       ```bash
       sudo apt install python3-pip virtualenv git
       cd /tmp
-      git clone https://github.com/Pack3tL0ss/ConsolePi.git
+      git clone https://github.com/StofflHD/ConsolePi.git
       cd ConsolePi  # Should now be in /tmp/ConsolePi
       python3 -m virtualenv venv
       sudo mv /tmp/ConsolePi /etc
@@ -1032,12 +1075,12 @@ ConsolePi Should work on all variants of the RaspberryPi and will work on other 
 
 *Have some good pics of ConsolePi in action?  Let me know.*
 
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/consolepi-cm.png)
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/consolepi-cm-r2-extension.png)
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/garagepi.png)
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ConsolePi0.jpg)
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/ConsolePi.jpg)
-  ![ConsolePi in action](https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/readme_content/consolepi_cy.jpg)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/consolepi-cm.png)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/consolepi-cm-r2-extension.png)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/garagepi.png)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ConsolePi0.jpg)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/ConsolePi.jpg)
+  ![ConsolePi in action](https://raw.githubusercontent.com/StofflHD/ConsolePi/master/readme_content/consolepi_cy.jpg)
 
 # CREDITS
 

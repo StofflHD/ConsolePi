@@ -19,7 +19,6 @@ on:
         default: Europe/Berlin
   push:
     tags: ["image-v*"]
-    branches: ["feat/os-image"]   # TEMP: test builds before merge, remove when merging
 
 permissions:
   contents: write
@@ -83,5 +82,20 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/out"
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "ConsolePi Image $GITHUB_REF_NAME" \
-            --notes-file <(echo "Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed."; echo; echo '```'; cat build-info.txt; echo '```'; echo; echo "See image/README.md for usage.") \
+            --notes-file <(cat <<EOF
+          Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed – Pi Zero 2 W, 3B/3B+, 4, 400, 5.
+
+          **Quick start**
+          1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
+          2. Re-plug the card, edit \`consolepi-setup.txt\` on the **bootfs** drive (user, password, WiFi), save.
+          3. Boot, then open \`https://consolepi.local\` in a browser or \`ssh <user>@consolepi.local\`.
+             No WiFi in range: hotspot \`ConsolePi\` → \`https://10.110.0.1\`.
+
+          Full guide: [image/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/image/README.md)
+
+          \`\`\`
+          $(cat build-info.txt)
+          \`\`\`
+          EOF
+            ) \
             ./*.img.xz ./*.sha256
