@@ -20,28 +20,37 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
 * Releases: tags `image-v*` publish the image as a GitHub release.
 * Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image`.
 
-## Flashing
+## Flashing and setup
 
-Use **Raspberry Pi Imager**:
+1. Write the `.img.xz` with any tool: Raspberry Pi Imager (*Use custom*), balenaEtcher, …
+   Imager doesn't offer its OS customisation (user, WiFi) for custom images – that's what step 2 is for.
+2. Re-plug the card. The small FAT partition **bootfs** shows up on your PC (Windows: as a drive).
+   Open **`consolepi-setup.txt`** with a text editor, fill in at least `user` and `password`
+   (and your WiFi), remove the `#` in front of those lines and save:
 
-1. *Choose OS* → *Use custom* → select the `.img.xz`.
-2. When asked, **edit the OS customisation settings**:
-   * username / password – this is your login (the user gets all ConsolePi rights)
-   * WiFi (optional) – a WiFi the Pi should join as client
-   * *Services* → enable SSH
-3. Write the card, boot the Pi.
+   ```ini
+   user=stefan
+   password=MySecret123
+   wifi_ssid=My WiFi
+   wifi_password=my-wifi-password
+   wifi_country=DE
+   hotspot_password=my-hotspot-password
+   ```
+3. Boot the Pi. The settings are applied on first boot, then `consolepi-setup.txt` is deleted
+   (it holds passwords). What was applied – and any problems – is in `consolepi-setup.done.txt`
+   on the same partition.
 
-Without the customisation the Pi asks for a user on the local console (keyboard + monitor) on first boot.
+The user gets all ConsolePi rights (groups `consolepi`, `dialout`, `sudo`). SSH is enabled.
+Without `user`/`password` the Pi asks for a user on the local console (keyboard + monitor).
 
 ## First boot
 
 * The file system grows to the full card and the SSH host keys are generated – give it a minute.
 * If no configured WiFi is in range the Pi opens its **hotspot**:
-  * SSID `ConsolePi`, password `ConsolePiR0cks!!`
+  * SSID `ConsolePi`, password `ConsolePiR0cks!!` unless set via `hotspot_ssid` / `hotspot_password`
   * the Pi is `10.110.0.1` → `ssh <user>@10.110.0.1`
+* Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
 * Run `consolepi-menu` to connect to a serial device.
-* **Change the hotspot password**: `consolepi-config` opens the config, then apply it with
-  `sudo consolepi-upgrade` (needs internet, it also updates ConsolePi).
 
 Hostname `consolepi`, WiFi country `DE`, timezone `Europe/Berlin` (can be changed when running the workflow manually).
 

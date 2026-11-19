@@ -168,6 +168,36 @@ cp "$MNT/var/log/ConsolePi/install.log" "$OUT_DIR/install.log" 2>/dev/null || cp
 grep -q "Silent Install Complete" "$WORK_DIR/installer-output.log" || die "installer did not complete, see install.log"
 [ -x "$MNT/etc/ConsolePi/venv/bin/python3" ] || die "installer finished but ConsolePi venv is missing"
 
+# -- first boot setup (consolepi-setup.txt on the boot partition) --------------------------------
+log "Installing first boot setup"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-setup" "$MNT/usr/local/sbin/consolepi-setup"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-setup.service" "$MNT/etc/systemd/system/consolepi-setup.service"
+# CRLF so it opens fine in Windows notepad right after flashing
+sed 's/\r$//; s/$/\r/' "$SCRIPT_DIR/rootfs/boot/firmware/consolepi-setup.txt" > "$MNT/boot/firmware/consolepi-setup.txt"
+chroot "$MNT" systemctl enable consolepi-setup.service
+
+# smoke test with the image's real nmcli/openssl against a scratch root (no wifi_country/hostname: they act on the live system)
+log "Smoke test consolepi-setup"
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+T=/tmp/setup-smoke
+mkdir -p $T/boot/firmware $T/etc/NetworkManager/system-connections $T/etc/ConsolePi $T/home/pi
+cp /etc/passwd $T/etc/passwd
+cp /etc/NetworkManager/system-connections/hotspot.nmconnection $T/etc/NetworkManager/system-connections/
+cp /etc/ConsolePi/ConsolePi.yaml $T/etc/ConsolePi/
+printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\n' > $T/boot/firmware/consolepi-setup.txt
+CONSOLEPI_SETUP_ROOT=$T /usr/local/sbin/consolepi-setup
+test ! -e $T/boot/firmware/consolepi-setup.txt
+grep -q '^smoke:\$6\$' $T/boot/firmware/userconf.txt
+f=$(ls $T/etc/NetworkManager/system-connections/wifi-*.nmconnection)
+cat "$f"
+grep -q '^psk=smoke-psk-123' "$f"
+grep -q '^psk=NewHotspotPW' $T/etc/NetworkManager/system-connections/hotspot.nmconnection
+grep -q "wlan_psk: 'NewHotspotPW'" $T/etc/ConsolePi/ConsolePi.yaml
+grep -q 'Problems' $T/boot/firmware/consolepi-setup.done.txt && { cat $T/boot/firmware/consolepi-setup.done.txt; exit 1; }
+rm -rf $T
+echo "smoke test OK"
+EOF
+
 # -- image specific adjustments ------------------------------------------------------------------
 log "Finalizing image"
 chroot "$MNT" /bin/bash -euo pipefail <<EOF
@@ -193,6 +223,8 @@ systemctl enable regenerate_ssh_host_keys 2>/dev/null || true
 
 # diagnostics for the build log
 echo "--- first boot related units:"; systemctl list-unit-files | grep -Ei 'regenerate|userconf|ssh|NetworkManager|consolepi|ser2net|rfcomm' || true
+echo "--- consolepi-setup ordering:"; systemctl show -p Before,After,WantedBy consolepi-setup.service 2>/dev/null || true
+echo "--- wifi country / rfkill:"; grep -o 'cfg80211.ieee80211_regdom=[A-Z]*' /boot/firmware/cmdline.txt || echo "regdom not set in cmdline"
 echo "--- consolepi user groups for \$first_user:"; id "\$first_user" || true
 
 # cleanup

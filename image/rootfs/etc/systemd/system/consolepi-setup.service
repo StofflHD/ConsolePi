@@ -1,0 +1,15 @@
+[Unit]
+Description=ConsolePi first boot setup (consolepi-setup.txt on the boot partition)
+Documentation=https://github.com/StofflHD/ConsolePi/tree/master/image
+RequiresMountsFor=/boot/firmware
+# must run before the RPi OS user wizard (reads userconf.txt) and before NetworkManager loads its profiles
+Before=userconfig.service NetworkManager.service ssh.service
+ConditionPathExists=/boot/firmware/consolepi-setup.txt
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/consolepi-setup
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
