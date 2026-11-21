@@ -1,0 +1,25 @@
+#!/bin/sh
+# Starts ttyd for the ConsolePi web terminal (consolepi-web.service).  A script rather than the unit
+# file, because the colour theme is JSON and quoting that in ExecStart is fragile.
+#
+# Font size: sudo systemctl edit consolepi-web  ->
+#   [Service]
+#   Environment=CONSOLEPI_WEB_FONT_SIZE=18
+
+FONT_SIZE="${CONSOLEPI_WEB_FONT_SIZE:-16}"
+
+# "Rust" colour scheme (same as notepad-rs): warm dark neutrals, orange accent.
+# All text colours have a WCAG contrast of >= 4.5 on the background.
+THEME='{"background":"#26221f","foreground":"#f2ede8","cursor":"#f0773a","cursorAccent":"#26221f",'\
+'"selectionBackground":"#7a2e12","selectionForeground":"#fff4ec",'\
+'"black":"#1b1917","red":"#ff6e5c","green":"#a9c46c","yellow":"#f0b13a",'\
+'"blue":"#7fa8d8","magenta":"#d990b8","cyan":"#6fc3b6","white":"#d6cdc4",'\
+'"brightBlack":"#978b81","brightRed":"#ff9180","brightGreen":"#c2da8c","brightYellow":"#f6c96a",'\
+'"brightBlue":"#a3c3ea","brightMagenta":"#ebb0d0","brightCyan":"#93d8cd","brightWhite":"#ffffff"}'
+
+exec /usr/local/bin/ttyd --port 443 --ssl \
+    --ssl-cert /etc/consolepi-web/cert.pem --ssl-key /etc/consolepi-web/key.pem \
+    --writable --max-clients 5 \
+    -t "fontSize=${FONT_SIZE}" -t "theme=${THEME}" \
+    -t titleFixed=ConsolePi -t disableLeaveAlert=true \
+    /usr/local/sbin/consolepi-web-login

@@ -71,6 +71,9 @@ browser – phone, tablet or laptop, no app needed. Log in with your user and pa
 * The certificate is self-signed (created on the Pi's first boot, unique per Pi), so the browser
   warns once – accept it (*Advanced → Proceed*).
 * Same users and passwords as SSH; at most 5 sessions at the same time.
+* Font size 16 px, "Rust" colour scheme (warm dark background, orange cursor). Other font size:
+  `sudo systemctl edit consolepi-web`, add `[Service]` and `Environment=CONSOLEPI_WEB_FONT_SIZE=18`,
+  then `sudo systemctl restart consolepi-web`. Colours: `/usr/local/sbin/consolepi-web-start`.
 * Turn it off: `sudo systemctl disable --now consolepi-web`
 * Built on [ttyd](https://github.com/tsl0922/ttyd) (`/usr/local/bin/ttyd`, service `consolepi-web`).
 

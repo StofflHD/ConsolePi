@@ -184,7 +184,8 @@ log "Installing web terminal (ttyd ${TTYD_VERSION})"
 curl -sSLf -o "$WORK_DIR/ttyd" "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.aarch64"
 echo "${TTYD_SHA256}  $WORK_DIR/ttyd" | sha256sum -c - || die "checksum mismatch for ttyd"
 install -m 0755 "$WORK_DIR/ttyd" "$MNT/usr/local/bin/ttyd"
-install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-cert" "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-login" "$MNT/usr/local/sbin/"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-cert" "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-login" \
+    "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-web-start" "$MNT/usr/local/sbin/"
 install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-web.service" "$MNT/etc/systemd/system/"
 install -m 0644 "$SCRIPT_DIR/rootfs/etc/profile.d/zz-consolepi-web.sh" "$MNT/etc/profile.d/"
 chroot "$MNT" systemctl enable consolepi-web.service
@@ -197,6 +198,10 @@ test "$(stat -c %a $T/web/key.pem)" = 600
 rm -rf $T
 test ! -e /etc/consolepi-web    # must be created on the Pi, never shipped in the image
 bash -n /etc/profile.d/zz-consolepi-web.sh
+# ttyd options: theme must be valid JSON, font size 16 by default
+sed '/^exec /,$d' /usr/local/sbin/consolepi-web-start > $T.sh
+echo 'printf "%s" "$THEME" | python3 -c "import json,sys; json.load(sys.stdin)"; test "$FONT_SIZE" = 16' >> $T.sh
+sh $T.sh && rm -f $T.sh
 echo "web terminal OK"
 EOF
 
