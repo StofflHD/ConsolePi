@@ -933,7 +933,9 @@ class Menu:
                 f"{self.log_sym_2bang}  There is Nothing to display  {self.log_sym_2bang}"
             ]
         )
-        opts = ["x"] if not self.legend_in or "refresh" not in self.legend_in.get("opts", []) else ["refresh", "x"]
+        # keep the options that still make sense without anything to connect to
+        legend_in_opts = (self.legend_in or {}).get("opts", [])
+        opts = [o for o in ["refresh", "shutdown"] if o in legend_in_opts] + ["x"]
         self.page.legend.update(legend={"opts": opts}, width=self.page.cols)
 
         for menu_part in [self.page.legend, self.page.footer, self.page.header]:
