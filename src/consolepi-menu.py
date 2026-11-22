@@ -78,7 +78,7 @@ class ConsolePiMenu(Rename):
             'shell': ['sh', 'Enter Local Shell'],
             'rn': ['rn', 'Rename Adapters'],
             'refresh': ['r', 'Refresh'],
-            'shutdown': ['sd', 'Shut down ConsolePi'],
+            'shutdown': ['sd', 'Shut down'],
             'sync': ['s', 'Sync with cloud'],
             'tp': ['tp', 'Toggle Display of associated TELNET ports'],
             'con': ['c', 'Change Default Serial Settings (devices marked with ** only)'],
