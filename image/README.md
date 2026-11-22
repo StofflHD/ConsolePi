@@ -60,7 +60,7 @@ Notes:
   * SSID `ConsolePi`, password `ConsolePiR0cks!!` unless set via `hotspot_ssid` / `hotspot_password`
   * the Pi is `10.110.0.1` → `ssh <user>@10.110.0.1`
 * Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
-* Run `consolepi-menu` to connect to a serial device.
+* Run `consolepi-menu` to connect to a serial device. `sd` in the menu shuts the Pi down when you're done.
 
 ## Web terminal (browser access, like AirConsole)
 

@@ -78,6 +78,7 @@ class ConsolePiMenu(Rename):
             'shell': ['sh', 'Enter Local Shell'],
             'rn': ['rn', 'Rename Adapters'],
             'refresh': ['r', 'Refresh'],
+            'shutdown': ['sd', 'Shut down ConsolePi'],
             'sync': ['s', 'Sync with cloud'],
             'tp': ['tp', 'Toggle Display of associated TELNET ports'],
             'con': ['c', 'Change Default Serial Settings (devices marked with ** only)'],
@@ -1080,6 +1081,8 @@ class ConsolePiMenu(Rename):
             foot_opts.append('rn')
             menu_actions['rn'] = self.rename_menu
         foot_opts.append('refresh')
+        foot_opts.append('shutdown')
+        menu_actions['sd'] = self.shutdown
 
         menu_actions = menu.print_menu(
             outer_body, header='{{cyan}}Console{{red}}Pi{{norm}} {{cyan}}Serial Menu{{norm}}',
@@ -1393,6 +1396,19 @@ class ConsolePiMenu(Rename):
         return self.flow
 
     # -- // EXIT \\ --
+    def shutdown(self):
+        '''Power the ConsolePi off (e.g. battery powered, when done).  Asks for confirmation.'''
+        print('\n Shutting down ends all sessions on this ConsolePi (SSH, web terminal, serial).')
+        if not utils.user_input_bool(' Shut down ConsolePi now'):
+            return
+        print(' Shutting down... wait until the green LED stops blinking (~20 s) before unplugging power.')
+        # -n: never prompt; the image user has passwordless sudo, other installs may not
+        rc = system('sudo -n systemctl poweroff')
+        if rc != 0:
+            log.show('Shutdown failed: this user needs sudo rights for "systemctl poweroff".')
+            return
+        sys.exit(0)
+
     def exit(self):
         self.go = False
 
