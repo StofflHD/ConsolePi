@@ -19,6 +19,8 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
 
 * Releases: tags `image-v*` publish the image as a GitHub release.
 * Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image`.
+* File names carry the version: `consolepi-v0.1.3-bookworm-arm64-lite.img.xz` for releases,
+  `consolepi-dev-<date>-<commit>-…` for manual builds. `/etc/consolepi-image` on the Pi shows it too.
 
 ## Flashing and setup
 

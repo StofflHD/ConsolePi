@@ -20,6 +20,7 @@
 #   TIMEZONE         timezone                                     default: Europe/Berlin
 #   HOTSPOT_SSID     SSID of the fallback hotspot                 default: ConsolePi
 #   HOTSPOT_PSK      PSK of the fallback hotspot (8-63 chars)     default: ConsolePiR0cks!!
+#   IMG_VERSION      version in file name + /etc/consolepi-image  default: dev-YYYYMMDD
 #   OUT_DIR          output directory                             default: ./out
 #   WORK_DIR         work directory (needs ~6 GB)                 default: ./work
 # -----------------------------------------------------------------------------------------------
@@ -33,6 +34,7 @@ WLAN_COUNTRY="${WLAN_COUNTRY:-DE}"
 TIMEZONE="${TIMEZONE:-Europe/Berlin}"
 HOTSPOT_SSID="${HOTSPOT_SSID:-ConsolePi}"
 HOTSPOT_PSK="${HOTSPOT_PSK:-ConsolePiR0cks!!}"
+IMG_VERSION="${IMG_VERSION:-dev-$(date -u +%Y%m%d)}"
 OUT_DIR="$(realpath -m "${OUT_DIR:-./out}")"
 WORK_DIR="$(realpath -m "${WORK_DIR:-./work}")"
 TTYD_VERSION=1.7.7
@@ -49,6 +51,7 @@ die() { echo -e "\n\e[31mERROR: $*\e[0m" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "must run as root"
 [ ${#HOTSPOT_PSK} -ge 8 ] && [ ${#HOTSPOT_PSK} -le 63 ] || die "HOTSPOT_PSK must be 8-63 characters"
+[[ "$IMG_VERSION" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid IMG_VERSION (letters, digits, . _ -)"
 [[ "$IMG_HOSTNAME" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]] || die "invalid IMG_HOSTNAME"
 for bin in curl xz parted losetup e2fsck resize2fs zerofree sha256sum chroot; do
     command -v $bin >/dev/null || die "missing tool: $bin"
@@ -277,6 +280,7 @@ EOF
 
 # build info
 cat > "$MNT/etc/consolepi-image" <<EOF
+version=${IMG_VERSION}
 base_image=${base_name}
 repo=${CONSOLEPI_REPO}
 branch=${CONSOLEPI_BRANCH}
@@ -299,7 +303,7 @@ zerofree "${LOOP}p2"                  # zero unused blocks so the image compress
 losetup -d "$LOOP"; LOOP=""
 
 # -- compress ------------------------------------------------------------------------------------
-out_name="consolepi-${base_name#*-raspios-}-$(date -u +%Y%m%d)"
+out_name="consolepi-${IMG_VERSION}-${base_name#*-raspios-}"    # e.g. consolepi-v0.1.3-bookworm-arm64-lite
 log "Compressing to $OUT_DIR/${out_name}.img.xz"
 mv base.img "${out_name}.img"
 xz -T0 -6 -c "${out_name}.img" > "$OUT_DIR/${out_name}.img.xz"

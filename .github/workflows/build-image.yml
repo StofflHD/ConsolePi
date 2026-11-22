@@ -52,7 +52,13 @@ jobs:
           else
             export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64_latest
           fi
-          sudo --preserve-env=BASE_IMAGE_URL,WLAN_COUNTRY,TIMEZONE,CONSOLEPI_REPO,CONSOLEPI_BRANCH \
+          # file name version: tag image-v0.1.3 -> v0.1.3, manual runs -> dev-<date>-<commit>
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            export IMG_VERSION="${GITHUB_REF_NAME#image-}"
+          else
+            export IMG_VERSION="dev-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+          fi
+          sudo --preserve-env=BASE_IMAGE_URL,WLAN_COUNTRY,TIMEZONE,CONSOLEPI_REPO,CONSOLEPI_BRANCH,IMG_VERSION \
             OUT_DIR="$RUNNER_TEMP/out" WORK_DIR="$RUNNER_TEMP/work" bash image/build-image.sh
 
       - name: Upload install log
