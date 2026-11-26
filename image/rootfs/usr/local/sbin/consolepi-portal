@@ -25,7 +25,10 @@ YAML = Path("/etc/ConsolePi/ConsolePi.yaml")
 DNS_CONF = Path(os.environ.get("CONSOLEPI_PORTAL_DNS_CONF",
                                "/etc/NetworkManager/dnsmasq-shared.d/consolepi-portal.conf"))
 
-# connectivity check hosts of iOS/macOS, Android, Windows, Firefox and Linux (NetworkManager)
+# connectivity check hosts of iOS/macOS, Android, Windows, Firefox and Linux (NetworkManager).
+# Never add a domain on the browsers' HSTS preload list (e.g. ping.archlinux.org, nmcheck.gnome.org):
+# browsers then force https, hit the web terminal's certificate and refuse to show the page at all.
+# Linux desktops get the page through Firefox's own check (detectportal.firefox.com) instead.
 PROBE_HOSTS = [
     "captive.apple.com", "www.appleiphonecell.com", "www.itools.info", "www.ibook.info",
     "www.airport.us", "www.thinkdifferent.us",
@@ -33,7 +36,7 @@ PROBE_HOSTS = [
     "clients3.google.com", "connectivitycheck.samsung.com",
     "www.msftconnecttest.com", "ipv6.msftconnecttest.com", "www.msftncsi.com",
     "detectportal.firefox.com",
-    "nmcheck.gnome.org", "network-test.debian.org", "connectivity-check.ubuntu.com", "ping.archlinux.org",
+    "network-test.debian.org", "connectivity-check.ubuntu.com",
 ]
 
 PAGE = """<!doctype html>
