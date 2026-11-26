@@ -3,8 +3,7 @@
 Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed. Flash it, boot it, done – no
 installer run, no internet needed on the Pi.
 
-Each release has two images with the same ConsolePi: **bookworm** (Raspberry Pi OS 12, long tested –
-recommended) and **trixie** (Raspberry Pi OS 13, newer packages).
+Base: Raspberry Pi OS 13 (trixie). Bookworm images were published up to `image-v0.1.3`.
 
 ## Supported hardware
 
@@ -21,9 +20,8 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
 ## Download
 
 * Releases: tags `image-v*` publish the image as a GitHub release.
-* Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image-<base>`.
-* File names carry the version and base: `consolepi-v0.1.4-bookworm-arm64-lite.img.xz` /
-  `consolepi-v0.1.4-trixie-arm64-lite.img.xz` for releases,
+* Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image-trixie`.
+* File names carry the version and base: `consolepi-v0.1.4-trixie-arm64-lite.img.xz` for releases,
   `consolepi-dev-<date>-<commit>-…` for manual builds. `/etc/consolepi-image` on the Pi shows it too.
 
 ## Flashing and setup

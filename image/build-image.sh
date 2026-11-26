@@ -12,7 +12,7 @@
 #   Pi Zero 2 W, Pi 3B/3B+, Pi 4, Pi 400, Pi 5, CM3/CM4
 #
 # Settings (environment variables, all optional):
-#   BASE_IMAGE_URL   Raspberry Pi OS Lite arm64 image (.img.xz)   default: latest bookworm
+#   BASE_IMAGE_URL   Raspberry Pi OS Lite arm64 image (.img.xz)   default: latest trixie
 #   CONSOLEPI_REPO   GitHub repo owner/name to install from       default: StofflHD/ConsolePi
 #   CONSOLEPI_BRANCH branch to install                            default: master
 #   IMG_HOSTNAME     hostname                                     default: consolepi
@@ -26,7 +26,7 @@
 # -----------------------------------------------------------------------------------------------
 set -euo pipefail
 
-BASE_IMAGE_URL="${BASE_IMAGE_URL:-https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64_latest}"
+BASE_IMAGE_URL="${BASE_IMAGE_URL:-https://downloads.raspberrypi.com/raspios_lite_arm64_latest}"
 CONSOLEPI_REPO="${CONSOLEPI_REPO:-StofflHD/ConsolePi}"
 CONSOLEPI_BRANCH="${CONSOLEPI_BRANCH:-master}"
 IMG_HOSTNAME="${IMG_HOSTNAME:-consolepi}"
@@ -363,7 +363,7 @@ zerofree "${LOOP}p2"                  # zero unused blocks so the image compress
 losetup -d "$LOOP"; LOOP=""
 
 # -- compress ------------------------------------------------------------------------------------
-out_name="consolepi-${IMG_VERSION}-${base_name#*-raspios-}"    # e.g. consolepi-v0.1.3-bookworm-arm64-lite
+out_name="consolepi-${IMG_VERSION}-${base_name#*-raspios-}"    # e.g. consolepi-v0.1.4-trixie-arm64-lite
 log "Compressing to $OUT_DIR/${out_name}.img.xz"
 mv base.img "${out_name}.img"
 xz -T0 -6 -c "${out_name}.img" > "$OUT_DIR/${out_name}.img.xz"

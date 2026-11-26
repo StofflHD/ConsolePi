@@ -2,15 +2,11 @@ name: Build ConsolePi OS image
 
 # Builds Raspberry Pi OS Lite (arm64) images with ConsolePi pre-installed.
 #  - manually: Actions tab -> "Build ConsolePi OS image" -> Run workflow  (images are attached to the run as artifacts)
-#  - on tag image-v*: builds bookworm + trixie and publishes a GitHub release with both images
+#  - on tag image-v*: builds the image and publishes a GitHub release with it
+# Base: Raspberry Pi OS 13 (trixie).  To add another base, extend matrix.base below.
 on:
   workflow_dispatch:
     inputs:
-      base:
-        description: "Raspberry Pi OS base"
-        type: choice
-        options: [bookworm, trixie, both]
-        default: bookworm
       wlan_country:
         description: "WiFi country code"
         default: DE
@@ -34,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base: ${{ fromJSON((github.event_name != 'workflow_dispatch' || inputs.base == 'both') && '["bookworm","trixie"]' || format('["{0}"]', inputs.base)) }}
+        base: [trixie]
     steps:
       - uses: actions/checkout@v4
 
@@ -51,11 +47,10 @@ jobs:
           CONSOLEPI_REPO: ${{ github.repository }}
           CONSOLEPI_BRANCH: ${{ github.ref_type == 'branch' && github.ref_name || github.event.repository.default_branch }}
         run: |
-          if [ "$BASE" = "trixie" ]; then
-            export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_arm64_latest
-          else
-            export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_oldstable_lite_arm64_latest
-          fi
+          case "$BASE" in
+            trixie)   export BASE_IMAGE_URL=https://downloads.raspberrypi.com/raspios_lite_arm64_latest ;;
+            *) echo "unknown base $BASE"; exit 1 ;;
+          esac
           # file name version: tag image-v0.1.3 -> v0.1.3, manual runs -> dev-<date>-<commit>
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             export IMG_VERSION="${GITHUB_REF_NAME#image-}"
@@ -110,9 +105,7 @@ jobs:
             --notes-file <(cat <<EOF
           Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed – Pi Zero 2 W, 3B/3B+, 4, 400, 5.
 
-          Two images, same ConsolePi – pick one:
-          * \`…-bookworm-…\` – Raspberry Pi OS 12, the long tested base (**recommended**)
-          * \`…-trixie-…\` – Raspberry Pi OS 13, newer packages
+          Base: Raspberry Pi OS 13 (trixie).
 
           **Quick start**
           1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
@@ -123,9 +116,7 @@ jobs:
           Full guide: [image/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/image/README.md)
 
           \`\`\`
-          $(cat build-info-bookworm.txt 2>/dev/null)
-
-          $(cat build-info-trixie.txt 2>/dev/null)
+          $(cat build-info-*.txt)
           \`\`\`
           EOF
             ) \
