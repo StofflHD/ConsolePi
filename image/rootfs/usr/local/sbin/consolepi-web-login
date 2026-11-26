@@ -1,5 +1,20 @@
 #!/bin/sh
 # started by ttyd for every browser session: normal system login (PAM, same users/passwords as
-# SSH), the marker makes /etc/profile.d/zz-consolepi-web.sh open consolepi-menu after login
+# SSH), the marker makes /etc/profile.d/zz-consolepi-web.sh open consolepi-menu after login.
+#
+# Works like a getty: after 'exit' (or a failed login) the login prompt comes back, instead of
+# ttyd closing the connection.  login hangs up the terminal (vhangup) when it starts, so it runs
+# in its own session (setsid -c) and every round opens the terminal anew.  Closing the browser tab
+# still ends everything: ttyd sends SIGHUP, the trap passes it on.
 export CONSOLEPI_WEB=1
-exec /bin/login -p
+tty=$(tty) || exec /bin/login -p
+pid=
+trap '[ -n "$pid" ] && kill -HUP "$pid" 2>/dev/null; exit 0' HUP TERM
+while :; do
+    setsid -c -w /bin/login -p <"$tty" >"$tty" 2>&1 &
+    pid=$!
+    wait "$pid"
+    pid=
+    printf '\r\n' >"$tty" 2>/dev/null || exit 0
+    sleep 1
+done

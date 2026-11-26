@@ -201,6 +201,10 @@ test "$(stat -c %a $T/web/key.pem)" = 600
 rm -rf $T
 test ! -e /etc/consolepi-web    # must be created on the Pi, never shipped in the image
 bash -n /etc/profile.d/zz-consolepi-web.sh
+# login loop (prompt comes back after exit) needs setsid with -c/-w and a login binary
+sh -n /usr/local/sbin/consolepi-web-login
+setsid --help | grep -q -- '--ctty' && setsid --help | grep -q -- '--wait'
+test -x /bin/login
 # ttyd options: theme must be valid JSON, font size 16 by default
 sed '/^exec /,$d' /usr/local/sbin/consolepi-web-start > $T.sh
 echo 'printf "%s" "$THEME" | python3 -c "import json,sys; json.load(sys.stdin)"; test "$FONT_SIZE" = 16' >> $T.sh
