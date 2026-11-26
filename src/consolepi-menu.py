@@ -2,6 +2,7 @@
 
 import json
 import readline # NoQA - allows input to accept backspace
+import subprocess
 import sys
 import re
 import threading
@@ -192,6 +193,16 @@ class ConsolePiMenu(Rename):
             if log.error_msgs:
                 # -- remove no ser2net.conf found msg if no local adapters
                 log.error_msgs = [m for m in log.error_msgs if 'No ser2net configuration found' not in m]
+
+    @staticmethod
+    def power_warning():
+        """Under-voltage warning line for the menu (weak power supply / power bank), None if all is fine."""
+        try:
+            out = subprocess.run(['/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck'],
+                                 capture_output=True, text=True, timeout=3).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out or None
 
     def picocom_help(self):
         print('----------------------- picocom Command Sequences -----------------------\n')
@@ -1086,7 +1097,7 @@ class ConsolePiMenu(Rename):
 
         menu_actions = menu.print_menu(
             outer_body, header='{{cyan}}Console{{red}}Pi{{norm}} {{cyan}}Serial Menu{{norm}}',
-            legend={'opts': foot_opts}, subs=slines, menu_actions=menu_actions
+            subhead=self.power_warning(), legend={'opts': foot_opts}, subs=slines, menu_actions=menu_actions
         )
 
         self.cur_menu = menu

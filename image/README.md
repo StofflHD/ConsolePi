@@ -1,7 +1,10 @@
 # ConsolePi OS image
 
-Raspberry Pi OS Lite (64 bit, Bookworm) with ConsolePi pre-installed. Flash it, boot it, done – no
+Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed. Flash it, boot it, done – no
 installer run, no internet needed on the Pi.
+
+Each release has two images with the same ConsolePi: **bookworm** (Raspberry Pi OS 12, long tested –
+recommended) and **trixie** (Raspberry Pi OS 13, newer packages).
 
 ## Supported hardware
 
@@ -18,8 +21,9 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
 ## Download
 
 * Releases: tags `image-v*` publish the image as a GitHub release.
-* Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image`.
-* File names carry the version: `consolepi-v0.1.3-bookworm-arm64-lite.img.xz` for releases,
+* Any build: Actions → **Build ConsolePi OS image** → open a run → artifact `consolepi-image-<base>`.
+* File names carry the version and base: `consolepi-v0.1.4-bookworm-arm64-lite.img.xz` /
+  `consolepi-v0.1.4-trixie-arm64-lite.img.xz` for releases,
   `consolepi-dev-<date>-<commit>-…` for manual builds. `/etc/consolepi-image` on the Pi shows it too.
 
 ## Flashing and setup
@@ -62,8 +66,13 @@ Notes:
 * If no configured WiFi is in range the Pi opens its **hotspot**:
   * SSID `ConsolePi`, password `ConsolePiR0cks!!` unless set via `hotspot_ssid` / `hotspot_password`
   * the Pi is `10.110.0.1` → `ssh <user>@10.110.0.1`
+  * phones and laptops show a **sign-in page** right after joining (like hotel WiFi) with a button to
+    the web terminal. If it doesn't appear, open `http://10.110.0.1`.
 * Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
 * Run `consolepi-menu` to connect to a serial device. `sd` in the menu shuts the Pi down when you're done.
+* If the power supply or power bank is too weak, the menu shows **`!! Under-voltage`** at the top
+  (now, or "occurred since boot"). USB-serial adapters can drop out then – use a stronger supply or a
+  shorter cable. Check any time: `/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck`.
 
 ## Web terminal (browser access, like AirConsole)
 
@@ -77,6 +86,8 @@ browser – phone, tablet or laptop, no app needed. Log in with your user and pa
 * Font size 16 px, "Rust" colour scheme (warm dark background, orange cursor). Other font size:
   `sudo systemctl edit consolepi-web`, add `[Service]` and `Environment=CONSOLEPI_WEB_FONT_SIZE=18`,
   then `sudo systemctl restart consolepi-web`. Colours: `/usr/local/sbin/consolepi-web-start`.
+* `http://…` is redirected to `https://…` (service `consolepi-portal`, port 80, which also serves the
+  hotspot sign-in page; off: `sudo systemctl disable --now consolepi-portal`).
 * Turn it off: `sudo systemctl disable --now consolepi-web`
 * Built on [ttyd](https://github.com/tsl0922/ttyd) (`/usr/local/bin/ttyd`, service `consolepi-web`).
 

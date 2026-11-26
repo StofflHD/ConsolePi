@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Prints a one line warning when the Raspberry Pi's power supply is too weak (under-voltage), nothing
+# otherwise.  Used by consolepi-menu (both menus).  Exit code: 0 ok/unknown, 1 under-voltage now, 2 since boot.
+#
+# Source: firmware throttle flags - bit 0 = under-voltage now, bit 16 = under-voltage occurred since boot.
+
+val=""
+for f in /sys/devices/platform/*/*firmware*/get_throttled /sys/devices/platform/*/*/*firmware*/get_throttled; do
+    [ -r "$f" ] && val=$(cat "$f" 2>/dev/null) && [ -n "$val" ] && break
+done
+if [ -z "$val" ] && command -v vcgencmd >/dev/null; then
+    val=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
+fi
+val=${val#0x}
+[[ $val =~ ^[0-9a-fA-F]+$ ]] || exit 0   # not a Raspberry Pi or no access
+flags=$((16#$val))
+
+if (( flags & 0x1 )); then
+    echo "!! Under-voltage: power supply / power bank too weak - adapters may drop out (use a stronger supply, short cable)"
+    exit 1
+elif (( flags & 0x10000 )); then
+    echo "!! Under-voltage occurred since boot - power supply / power bank or cable too weak"
+    exit 2
+fi
+exit 0

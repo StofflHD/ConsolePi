@@ -1,15 +1,15 @@
 name: Build ConsolePi OS image
 
-# Builds a Raspberry Pi OS Lite (arm64) image with ConsolePi pre-installed.
-#  - manually: Actions tab -> "Build ConsolePi OS image" -> Run workflow  (image is attached to the run as artifact)
-#  - on tag image-v*: additionally publishes a GitHub release with the image
+# Builds Raspberry Pi OS Lite (arm64) images with ConsolePi pre-installed.
+#  - manually: Actions tab -> "Build ConsolePi OS image" -> Run workflow  (images are attached to the run as artifacts)
+#  - on tag image-v*: builds bookworm + trixie and publishes a GitHub release with both images
 on:
   workflow_dispatch:
     inputs:
       base:
         description: "Raspberry Pi OS base"
         type: choice
-        options: [bookworm, trixie]
+        options: [bookworm, trixie, both]
         default: bookworm
       wlan_country:
         description: "WiFi country code"
@@ -31,6 +31,10 @@ jobs:
   build:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ${{ fromJSON((github.event_name != 'workflow_dispatch' || inputs.base == 'both') && '["bookworm","trixie"]' || format('["{0}"]', inputs.base)) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +45,7 @@ jobs:
 
       - name: Build image
         env:
-          BASE: ${{ inputs.base || 'bookworm' }}
+          BASE: ${{ matrix.base }}
           WLAN_COUNTRY: ${{ inputs.wlan_country || 'DE' }}
           TIMEZONE: ${{ inputs.timezone || 'Europe/Berlin' }}
           CONSOLEPI_REPO: ${{ github.repository }}
@@ -60,47 +64,68 @@ jobs:
           fi
           sudo --preserve-env=BASE_IMAGE_URL,WLAN_COUNTRY,TIMEZONE,CONSOLEPI_REPO,CONSOLEPI_BRANCH,IMG_VERSION \
             OUT_DIR="$RUNNER_TEMP/out" WORK_DIR="$RUNNER_TEMP/work" bash image/build-image.sh
+          # the image must really be the requested release (raspios "latest" links move over time)
+          grep -q -- "-${BASE}-" "$RUNNER_TEMP/out/build-info.txt" || { cat "$RUNNER_TEMP/out/build-info.txt"; exit 1; }
+          sudo mv "$RUNNER_TEMP/out/build-info.txt" "$RUNNER_TEMP/out/build-info-${BASE}.txt"
 
       - name: Upload install log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: install-log
+          name: install-log-${{ matrix.base }}
           path: |
             ${{ runner.temp }}/out/install.log
-            ${{ runner.temp }}/out/build-info.txt
+            ${{ runner.temp }}/out/build-info-*.txt
           if-no-files-found: ignore
 
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
-          name: consolepi-image
+          name: consolepi-image-${{ matrix.base }}
           path: |
             ${{ runner.temp }}/out/*.img.xz
             ${{ runner.temp }}/out/*.sha256
+            ${{ runner.temp }}/out/build-info-*.txt
           compression-level: 0   # already xz compressed
           retention-days: 14
 
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/image-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: consolepi-image-*
+          merge-multiple: true
+          path: out
+
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/image-v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd "$RUNNER_TEMP/out"
+          cd out
+          ls -l
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "ConsolePi Image $GITHUB_REF_NAME" \
             --notes-file <(cat <<EOF
           Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed – Pi Zero 2 W, 3B/3B+, 4, 400, 5.
+
+          Two images, same ConsolePi – pick one:
+          * \`…-bookworm-…\` – Raspberry Pi OS 12, the long tested base (**recommended**)
+          * \`…-trixie-…\` – Raspberry Pi OS 13, newer packages
 
           **Quick start**
           1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
           2. Re-plug the card, edit \`consolepi-setup.txt\` on the **bootfs** drive (user, password, WiFi), save.
           3. Boot, then open \`https://consolepi.local\` in a browser or \`ssh <user>@consolepi.local\`.
-             No WiFi in range: hotspot \`ConsolePi\` → \`https://10.110.0.1\`.
+             No WiFi in range: join the hotspot \`ConsolePi\` – the web terminal page opens by itself.
 
           Full guide: [image/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/image/README.md)
 
           \`\`\`
-          $(cat build-info.txt)
+          $(cat build-info-bookworm.txt 2>/dev/null)
+
+          $(cat build-info-trixie.txt 2>/dev/null)
           \`\`\`
           EOF
             ) \

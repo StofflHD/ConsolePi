@@ -542,6 +542,7 @@ class Menu:
         self.items_in = None
         self.subs_in = None
         self.legend_in = None
+        self.subhead_in = None
         self.menu_actions_in: Union[Dict[str, str], None] = None
         self.pbody = None
         self.pitems = None
@@ -657,6 +658,7 @@ class Menu:
 
         self.legend_options = DEF_LEGEND_OPTIONS if not self.legend_options else {**DEF_LEGEND_OPTIONS, **self.legend_options}
         header = self.format_header(header)
+        self.subhead_in = subhead
         subhead = self.format_subhead(subhead)
         self.format_legend(self.legend_in)
         if hide_legend is not None:
@@ -931,7 +933,7 @@ class Menu:
                 "No remote ConsolePis discovered and reachable.",
                 "No Manually Defined TELNET/SSH hosts configured.",
                 f"{self.log_sym_2bang}  There is Nothing to display  {self.log_sym_2bang}"
-            ]
+            ] + ([""] + utils.listify(self.subhead_in) if self.subhead_in else [])
         )
         # keep the options that still make sense without anything to connect to
         legend_in_opts = (self.legend_in or {}).get("opts", [])

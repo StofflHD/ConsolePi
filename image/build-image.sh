@@ -208,6 +208,33 @@ sh $T.sh && rm -f $T.sh
 echo "web terminal OK"
 EOF
 
+# -- hotspot portal (port 80): phones joining the hotspot get a page linking to the web terminal --------
+log "Installing hotspot portal"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-portal" "$MNT/usr/local/sbin/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-portal.service" "$MNT/etc/systemd/system/"
+chroot "$MNT" systemctl enable consolepi-portal.service
+chroot "$MNT" /usr/local/sbin/consolepi-portal --write-dns-config
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+grep -q '^address=/captive.apple.com/10.110.0.1$' /etc/NetworkManager/dnsmasq-shared.d/consolepi-portal.conf
+CONSOLEPI_PORTAL_PORT=8099 /usr/local/sbin/consolepi-portal & pid=$!
+sleep 2
+python3 - <<'PY'
+import http.client
+def get(host):
+    c = http.client.HTTPConnection("127.0.0.1", 8099, timeout=5)
+    c.request("GET", "/hotspot-detect.html", headers={"Host": host})
+    r = c.getresponse()
+    return r.status, r.getheader("Location"), r.read()
+s, _, body = get("captive.apple.com")
+assert s == 200 and b"Open web terminal" in body and b"https://127.0.0.1/" in body, (s, body[:200])
+s, loc, _ = get("127.0.0.1")
+assert s == 302 and loc == "https://127.0.0.1/", (s, loc)
+PY
+test "$(ps -o user= -p $pid)" = nobody
+kill $pid
+echo "portal OK"
+EOF
+
 # -- Bluetooth pairing agent (BlueZ rejects pairing without one; rfcomm.service comes from the installer)
 log "Installing Bluetooth pairing agent"
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
@@ -220,6 +247,7 @@ install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-bt-agent.servic
 # Bluetooth user (auto-login, limited menu) may power the Pi off from the menu - nothing else
 echo 'blue ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff' > "$MNT/etc/sudoers.d/consolepi-blue-poweroff"
 chmod 0440 "$MNT/etc/sudoers.d/consolepi-blue-poweroff"
+chroot "$MNT" usermod -aG video blue    # vcgencmd fallback of consolepi-powercheck (under-voltage warning)
 chroot "$MNT" systemctl enable consolepi-bt-agent.service
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' /usr/local/sbin/consolepi-bt-agent
@@ -228,6 +256,7 @@ test -L /etc/systemd/system/bluetooth.target.wants/consolepi-bt-agent.service
 systemctl is-enabled rfcomm.service bluetooth.service
 id blue
 command -v btmgmt                    # PIN pairing switches Secure Simple Pairing off with it
+command -v rfcomm sdptool hciconfig  # used by rfcomm.service / bluetooth.service (deprecated BlueZ tools)
 visudo -cf /etc/sudoers.d/consolepi-blue-poweroff
 sudo -l -U blue | grep -q '/usr/bin/systemctl poweroff'
 bash -n /etc/ConsolePi/src/consolepi-menu.sh
@@ -269,6 +298,8 @@ rm -rf $T
 out=$(cd /tmp && /etc/ConsolePi/venv/bin/python -c "exec(open('/etc/ConsolePi/src/consolepi-menu.py').read().split('MIN_WIDTH = ')[0])" 2>&1 || true)
 echo "$out" | tail -5
 echo "$out" | grep -qE 'ModuleNotFoundError|ImportError' && { echo "consolepi-menu imports broken"; exit 1; }
+test -x /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck
+/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck || true   # no firmware in the chroot: must not fail
 echo "smoke test OK"
 EOF
 
@@ -285,7 +316,7 @@ passwd -l consolepi
 # default user (uid 1000, renamed by Raspberry Pi Imager on first boot) gets ConsolePi rights
 first_user=\$(getent passwd 1000 | cut -d: -f1 || true)
 if [ -n "\$first_user" ]; then
-    for g in consolepi dialout adm sudo plugdev netdev gpio; do
+    for g in consolepi dialout adm sudo plugdev netdev gpio video; do
         getent group \$g >/dev/null && usermod -aG \$g "\$first_user"
     done
 fi
