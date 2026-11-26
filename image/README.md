@@ -79,6 +79,23 @@ browser – phone, tablet or laptop, no app needed. Log in with your user and pa
 * Turn it off: `sudo systemctl disable --now consolepi-web`
 * Built on [ttyd](https://github.com/tsl0922/ttyd) (`/usr/local/bin/ttyd`, service `consolepi-web`).
 
+## Bluetooth console
+
+The Pi is discoverable as `consolepi` and offers a Bluetooth serial port (SPP). Pair it – no PIN –
+and connect at 115200 baud: you are logged in automatically as user `blue` and a limited menu
+(locally attached adapters only) opens. Use SSH or the web terminal for everything else.
+
+* **Windows:** pair, then *More Bluetooth settings → COM Ports* shows the *Outgoing* port – open it in
+  PuTTY (Serial, 115200).
+* **Linux:** `bluetoothctl` → `pair <MAC>`, `trust <MAC>`; then `sudo rfcomm connect /dev/rfcomm0 <MAC> 1`
+  and `picocom -b 115200 /dev/rfcomm0` (Arch/CachyOS: `rfcomm` is in `bluez-deprecated-tools`).
+* **Android:** e.g. the app *Serial Bluetooth Terminal*.
+* **iPhone / iPad: not possible** – iOS has no classic Bluetooth serial support. Use the web terminal.
+
+Anyone in range can pair and gets the menu without a password. Stop advertising: `consolepi-btoff`
+(paired devices still connect). Turn Bluetooth access off completely:
+`sudo systemctl disable --now consolepi-bt-agent rfcomm`. Pairing log: `journalctl -u consolepi-bt-agent`.
+
 Hostname `consolepi`, WiFi country `DE`, timezone `Europe/Berlin` (can be changed when running the workflow manually).
 
 ## Building yourself

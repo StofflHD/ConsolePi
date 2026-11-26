@@ -208,6 +208,25 @@ sh $T.sh && rm -f $T.sh
 echo "web terminal OK"
 EOF
 
+# -- Bluetooth pairing agent (BlueZ rejects pairing without one; rfcomm.service comes from the installer)
+log "Installing Bluetooth pairing agent"
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+export DEBIAN_FRONTEND=noninteractive
+pkgs="python3-dbus python3-gi"
+apt-get install -y -qq --no-install-recommends $pkgs || { apt-get update -qq && apt-get install -y -qq --no-install-recommends $pkgs; }
+EOF
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-bt-agent" "$MNT/usr/local/sbin/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-bt-agent.service" "$MNT/etc/systemd/system/"
+chroot "$MNT" systemctl enable consolepi-bt-agent.service
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' /usr/local/sbin/consolepi-bt-agent
+python3 -c 'import dbus, dbus.service, dbus.mainloop.glib; from gi.repository import GLib'
+test -L /etc/systemd/system/bluetooth.target.wants/consolepi-bt-agent.service
+systemctl is-enabled rfcomm.service bluetooth.service
+id blue
+echo "bluetooth agent OK"
+EOF
+
 # smoke test with the image's real nmcli/openssl against a scratch root (no wifi_country/hostname: they act on the live system)
 log "Smoke test consolepi-setup"
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
@@ -267,7 +286,7 @@ rm -f /etc/ssh/ssh_host_*
 systemctl enable regenerate_ssh_host_keys 2>/dev/null || true
 
 # diagnostics for the build log
-echo "--- first boot related units:"; systemctl list-unit-files | grep -Ei 'regenerate|userconf|ssh|NetworkManager|consolepi|ser2net|rfcomm' || true
+echo "--- first boot related units:"; systemctl list-unit-files | grep -Ei 'regenerate|userconf|ssh|NetworkManager|consolepi|ser2net|rfcomm|bt-agent' || true
 echo "--- consolepi-setup ordering:"; systemctl show -p Before,After,WantedBy consolepi-setup.service 2>/dev/null || true
 echo "--- wifi country / rfkill:"; grep -o 'cfg80211.ieee80211_regdom=[A-Z]*' /boot/firmware/cmdline.txt || echo "regdom not set in cmdline"
 echo "--- consolepi user groups for \$first_user:"; id "\$first_user" || true

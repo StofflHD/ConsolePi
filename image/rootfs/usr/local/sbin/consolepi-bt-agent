@@ -1,0 +1,158 @@
+#!/usr/bin/python3
+"""Bluetooth pairing agent for ConsolePi.
+
+Without an agent BlueZ refuses every pairing request, so the Bluetooth serial console (rfcomm.service)
+can't be reached.  This agent registers as the default agent with capability NoInputNoOutput
+("just works" pairing, no PIN), accepts pairing and service requests, marks paired devices as trusted
+and keeps the adapter discoverable + pairable without a timeout.
+
+Turn Bluetooth access off:  sudo systemctl disable --now consolepi-bt-agent rfcomm
+"""
+import sys
+import time
+
+import dbus
+import dbus.mainloop.glib
+import dbus.service
+from gi.repository import GLib
+
+BUS_NAME = "org.bluez"
+AGENT_PATH = "/consolepi/bt_agent"
+CAPABILITY = "NoInputNoOutput"
+LEGACY_PIN = "0000"   # only for very old devices without Secure Simple Pairing
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+class Rejected(dbus.DBusException):
+    _dbus_error_name = "org.bluez.Error.Rejected"
+
+
+class Agent(dbus.service.Object):
+    def __init__(self, bus):
+        super().__init__(bus, AGENT_PATH)
+        self.bus = bus
+
+    def _props(self, path):
+        return dbus.Interface(self.bus.get_object(BUS_NAME, path), "org.freedesktop.DBus.Properties")
+
+    def describe(self, device):
+        try:
+            p = self._props(device)
+            return f'{p.Get("org.bluez.Device1", "Alias")} ({p.Get("org.bluez.Device1", "Address")})'
+        except dbus.DBusException:
+            return str(device)
+
+    def trust(self, device):
+        try:
+            p = self._props(device)
+            if not p.Get("org.bluez.Device1", "Trusted"):
+                p.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+                log(f"trusted {self.describe(device)}")
+        except dbus.DBusException as e:
+            log(f"could not trust {device}: {e}")
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="", out_signature="")
+    def Release(self):
+        log("agent released by bluetoothd")
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="")
+    def RequestAuthorization(self, device):
+        log(f"pairing accepted: {self.describe(device)}")
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="ou", out_signature="")
+    def RequestConfirmation(self, device, passkey):
+        log(f"pairing accepted: {self.describe(device)} (passkey {passkey:06d})")
+        self.trust(device)
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        log(f"service {uuid} authorized for {self.describe(device)}")
+        self.trust(device)
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        log(f"legacy PIN pairing: {self.describe(device)} (PIN {LEGACY_PIN})")
+        return LEGACY_PIN
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        log(f"passkey requested by {self.describe(device)}, answering 000000")
+        return dbus.UInt32(0)
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="ouq", out_signature="")
+    def DisplayPasskey(self, device, passkey, entered):
+        pass
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="os", out_signature="")
+    def DisplayPinCode(self, device, pincode):
+        pass
+
+    @dbus.service.method("org.bluez.Agent1", in_signature="", out_signature="")
+    def Cancel(self):
+        log("pairing cancelled by the remote device")
+
+
+def find_adapter(bus, timeout=30):
+    """Path of the first Bluetooth adapter; hci0 may appear a few seconds after bluetoothd."""
+    om = dbus.Interface(bus.get_object(BUS_NAME, "/"), "org.freedesktop.DBus.ObjectManager")
+    deadline = time.monotonic() + timeout
+    while True:
+        for path, ifaces in om.GetManagedObjects().items():
+            if "org.bluez.Adapter1" in ifaces:
+                return path
+        if time.monotonic() > deadline:
+            return None
+        time.sleep(1)
+
+
+def main():
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+    bus = dbus.SystemBus()
+
+    adapter = find_adapter(bus)
+    if not adapter:
+        log("no Bluetooth adapter found")
+        sys.exit(1)
+
+    agent = Agent(bus)
+    manager = dbus.Interface(bus.get_object(BUS_NAME, "/org/bluez"), "org.bluez.AgentManager1")
+    manager.RegisterAgent(AGENT_PATH, CAPABILITY)
+    manager.RequestDefaultAgent(AGENT_PATH)
+
+    props = dbus.Interface(bus.get_object(BUS_NAME, adapter), "org.freedesktop.DBus.Properties")
+    for name, value in (("Powered", dbus.Boolean(True)),
+                        ("PairableTimeout", dbus.UInt32(0)), ("Pairable", dbus.Boolean(True)),
+                        ("DiscoverableTimeout", dbus.UInt32(0)), ("Discoverable", dbus.Boolean(True))):
+        try:
+            props.Set("org.bluez.Adapter1", name, value)
+        except dbus.DBusException as e:
+            log(f"could not set {name}: {e}")
+    alias = props.Get("org.bluez.Adapter1", "Alias")
+    log(f'agent ready: "{alias}" on {adapter} is discoverable and accepts pairing without PIN')
+
+    # trust devices as soon as they are paired (rfcomm connects need a trusted or authorized device)
+    def on_props_changed(iface, changed, invalidated, path=None):
+        if iface == "org.bluez.Device1" and changed.get("Paired"):
+            agent.trust(path)
+
+    bus.add_signal_receiver(on_props_changed, dbus_interface="org.freedesktop.DBus.Properties",
+                            signal_name="PropertiesChanged", path_keyword="path")
+
+    loop = GLib.MainLoop()
+
+    # bluetoothd restarted -> registration is gone; exit so systemd starts us again
+    def on_owner(owner):
+        if not owner:
+            log("bluetoothd went away")
+            loop.quit()
+
+    bus.watch_name_owner(BUS_NAME, on_owner)
+    loop.run()
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

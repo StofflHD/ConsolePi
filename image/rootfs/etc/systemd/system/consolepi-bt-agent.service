@@ -1,0 +1,14 @@
+[Unit]
+Description=ConsolePi Bluetooth pairing agent (pairing without PIN for the Bluetooth console)
+ConditionPathIsDirectory=/sys/class/bluetooth
+Requires=bluetooth.service
+After=bluetooth.service
+PartOf=bluetooth.service
+
+[Service]
+ExecStart=/usr/local/sbin/consolepi-bt-agent
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=bluetooth.target
