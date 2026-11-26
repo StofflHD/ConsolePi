@@ -32,3 +32,7 @@
 # default: SSID ConsolePi, password ConsolePiR0cks!!  - please change / bitte aendern
 #hotspot_ssid=ConsolePi
 #hotspot_password=my-hotspot-password
+
+# PIN for Bluetooth pairing, 4-16 digits (longer is safer). Without it anyone in range can pair.
+# PIN fuer das Bluetooth-Koppeln, 4-16 Ziffern (laenger ist sicherer). Ohne PIN kann jeder koppeln.
+#bluetooth_pin=12345678

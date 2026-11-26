@@ -217,6 +217,9 @@ apt-get install -y -qq --no-install-recommends $pkgs || { apt-get update -qq && 
 EOF
 install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-bt-agent" "$MNT/usr/local/sbin/"
 install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-bt-agent.service" "$MNT/etc/systemd/system/"
+# Bluetooth user (auto-login, limited menu) may power the Pi off from the menu - nothing else
+echo 'blue ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff' > "$MNT/etc/sudoers.d/consolepi-blue-poweroff"
+chmod 0440 "$MNT/etc/sudoers.d/consolepi-blue-poweroff"
 chroot "$MNT" systemctl enable consolepi-bt-agent.service
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
 python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' /usr/local/sbin/consolepi-bt-agent
@@ -224,6 +227,11 @@ python3 -c 'import dbus, dbus.service, dbus.mainloop.glib; from gi.repository im
 test -L /etc/systemd/system/bluetooth.target.wants/consolepi-bt-agent.service
 systemctl is-enabled rfcomm.service bluetooth.service
 id blue
+command -v btmgmt                    # PIN pairing switches Secure Simple Pairing off with it
+visudo -cf /etc/sudoers.d/consolepi-blue-poweroff
+sudo -l -U blue | grep -q '/usr/bin/systemctl poweroff'
+bash -n /etc/ConsolePi/src/consolepi-menu.sh
+grep -q 'shutdown_pi' /etc/ConsolePi/src/consolepi-menu.sh
 echo "bluetooth agent OK"
 EOF
 
@@ -244,7 +252,7 @@ grep -q 'Windows-1252' $T/boot/firmware/consolepi-setup.done.txt
 rm $T/boot/firmware/userconf.txt $T/boot/firmware/consolepi-setup.done.txt
 cp /etc/NetworkManager/system-connections/hotspot.nmconnection $T/etc/NetworkManager/system-connections/
 cp /etc/ConsolePi/ConsolePi.yaml $T/etc/ConsolePi/
-printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\n' > $T/boot/firmware/consolepi-setup.txt
+printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\nbluetooth_pin=24681357\r\n' > $T/boot/firmware/consolepi-setup.txt
 CONSOLEPI_SETUP_ROOT=$T /usr/local/sbin/consolepi-setup
 test ! -e $T/boot/firmware/consolepi-setup.txt
 grep -q '^smoke:\$6\$' $T/boot/firmware/userconf.txt
@@ -253,6 +261,8 @@ cat "$f"
 grep -q '^psk=smoke-psk-123' "$f"
 grep -q '^psk=NewHotspotPW' $T/etc/NetworkManager/system-connections/hotspot.nmconnection
 grep -q "wlan_psk: 'NewHotspotPW'" $T/etc/ConsolePi/ConsolePi.yaml
+grep -qx 'pin=24681357' $T/etc/consolepi-bt.conf
+test "$(stat -c %a $T/etc/consolepi-bt.conf)" = 600
 grep -q 'Problems' $T/boot/firmware/consolepi-setup.done.txt && { cat $T/boot/firmware/consolepi-setup.done.txt; exit 1; }
 rm -rf $T
 # the menu's import block must load with the installed venv (regression: spinner import before sys.path)

@@ -37,6 +37,7 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
    wifi_password=my-wifi-password
    wifi_country=DE
    hotspot_password=my-hotspot-password
+   bluetooth_pin=12345678
    ```
 3. Boot the Pi. The settings are applied on first boot, then `consolepi-setup.txt` is deleted
    (it holds passwords). What was applied – and any problems – is in `consolepi-setup.done.txt`
@@ -81,9 +82,16 @@ browser – phone, tablet or laptop, no app needed. Log in with your user and pa
 
 ## Bluetooth console
 
-The Pi is discoverable as `consolepi` and offers a Bluetooth serial port (SPP). Pair it – no PIN –
-and connect at 115200 baud: you are logged in automatically as user `blue` and a limited menu
-(locally attached adapters only) opens. Use SSH or the web terminal for everything else.
+The Pi is discoverable as `consolepi` and offers a Bluetooth serial port (SPP). Pair it and connect
+at 115200 baud: you are logged in automatically as user `blue` and a limited menu opens (locally
+attached adapters, `sd` to shut down). Use SSH or the web terminal for everything else.
+
+**PIN:** set `bluetooth_pin=12345678` (4-16 digits) in `consolepi-setup.txt` – your PC or phone then
+asks for it when pairing. Without a PIN anyone in range can pair. Changing or removing the PIN later:
+put the file with the new `bluetooth_pin` (or `bluetooth_pin=none`) back on **bootfs** and reboot, or
+edit `/etc/consolepi-bt.conf` and `sudo systemctl restart consolepi-bt-agent`. On every change all
+paired devices are removed and have to pair again. The PIN uses classic Bluetooth PIN pairing (Secure
+Simple Pairing is switched off for it), so prefer 8 digits or more.
 
 * **Windows:** pair, then *More Bluetooth settings → COM Ports* shows the *Outgoing* port – open it in
   PuTTY (Serial, 115200).
@@ -92,7 +100,7 @@ and connect at 115200 baud: you are logged in automatically as user `blue` and a
 * **Android:** e.g. the app *Serial Bluetooth Terminal*.
 * **iPhone / iPad: not possible** – iOS has no classic Bluetooth serial support. Use the web terminal.
 
-Anyone in range can pair and gets the menu without a password. Stop advertising: `consolepi-btoff`
+Once paired, the menu opens without a password. Stop advertising: `consolepi-btoff`
 (paired devices still connect). Turn Bluetooth access off completely:
 `sudo systemctl disable --now consolepi-bt-agent rfcomm`. Pairing log: `journalctl -u consolepi-bt-agent`.
 

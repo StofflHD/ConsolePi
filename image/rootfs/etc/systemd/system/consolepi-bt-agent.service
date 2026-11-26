@@ -1,8 +1,8 @@
 [Unit]
-Description=ConsolePi Bluetooth pairing agent (pairing without PIN for the Bluetooth console)
+Description=ConsolePi Bluetooth pairing agent (Bluetooth serial console)
 ConditionPathIsDirectory=/sys/class/bluetooth
 Requires=bluetooth.service
-After=bluetooth.service
+After=bluetooth.service consolepi-setup.service
 PartOf=bluetooth.service
 
 [Service]

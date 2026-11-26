@@ -12,6 +12,7 @@ start:
     hostname                   hostname
     ssh_key                    public key added to the user's authorized_keys
     hotspot_ssid / hotspot_password   ConsolePi fallback hotspot
+    bluetooth_pin              PIN for Bluetooth pairing (4-16 digits, "none" = pairing without PIN)
 
 The file holds plain text passwords, so it is deleted once applied.  A summary without secrets
 is left in consolepi-setup.done.txt.  Lines starting with # are ignored.
@@ -32,10 +33,11 @@ DONE = FW / "consolepi-setup.done.txt"
 NM_DIR = ROOT / "etc/NetworkManager/system-connections"
 HOTSPOT = NM_DIR / "hotspot.nmconnection"
 CONSOLEPI_YAML = ROOT / "etc/ConsolePi/ConsolePi.yaml"
+BT_CONF = ROOT / "etc/consolepi-bt.conf"      # read by consolepi-bt-agent
 DRY_RUN = os.environ.get("CONSOLEPI_SETUP_DRY_RUN") == "1"  # testing: don't run system commands
 
 KEYS = {"user", "password", "wifi_ssid", "wifi_password", "wifi_country", "hostname", "ssh_key",
-        "hotspot_ssid", "hotspot_password"}
+        "hotspot_ssid", "hotspot_password", "bluetooth_pin"}
 
 summary: list = []
 errors: list = []
@@ -275,6 +277,22 @@ def apply_hotspot(cfg: dict) -> None:
         summary.append("hotspot_password: changed")
 
 
+def apply_bluetooth(cfg: dict) -> None:
+    pin = cfg.get("bluetooth_pin")
+    if pin is None:
+        return
+    if pin.lower() in ("none", "off", ""):
+        pin = ""
+    elif not re.fullmatch(r"\d{4,16}", pin):
+        errors.append("bluetooth_pin must be 4-16 digits (or none) -> Bluetooth PIN unchanged")
+        return
+    BT_CONF.write_text("# Bluetooth pairing PIN for consolepi-bt-agent (4-16 digits, empty = no PIN)\n"
+                       "# after a change: sudo systemctl restart consolepi-bt-agent (paired devices must pair again)\n"
+                       f"pin={pin}\n")
+    os.chmod(BT_CONF, 0o600)
+    summary.append("bluetooth_pin: " + ("set (paired devices have to pair again)" if pin else "removed, pairing without PIN"))
+
+
 def main() -> int:
     if not CFG.exists():
         return 0
@@ -282,7 +300,8 @@ def main() -> int:
     if not cfg:
         log("no settings in consolepi-setup.txt, nothing to do")
         return 0
-    for step in (apply_user, apply_country, apply_wifi, apply_hostname, apply_ssh_key, apply_hotspot):
+    for step in (apply_user, apply_country, apply_wifi, apply_hostname, apply_ssh_key, apply_hotspot,
+                 apply_bluetooth):
         try:
             step(cfg)
         except Exception as e:  # keep going, one bad setting shouldn't block the rest

@@ -317,6 +317,7 @@ main_menu() {
         item=1
         # echo " -- LOCAL CONNECTIONS --"
         echo ''
+        [[ ${#tty_list[@]} -eq 0 ]] && echo ' No USB to Serial adapters found (r to refresh)'
         for this_tty in ${tty_list[@]}; do
             get_tty_name    # checks for alias created via udev rules and uses alias as a descriptor if exists
             [[ $item -lt 10 ]] && spc="  " || spc=" "
@@ -331,6 +332,7 @@ main_menu() {
         echo ' r. refresh - detect connected serial adapters'
         $cloud && echo 'g. refresh - detect connected serial adapters + Update Connections to GDrive enabled ConsolePis'
         echo ' h. Display picocom help'
+        echo ' sd. Shut down'
         echo ' x. exit to shell'
         echo
                 echo ' ===================================================================='
@@ -362,6 +364,8 @@ main_menu() {
             sudo /etc/ConsolePi/cloud/gdrive/gdrive.py
         elif [[ ${selection,,} == "h" ]]; then
             picocom_help
+        elif [[ ${selection,,} == "sd" ]]; then
+            shutdown_pi
         elif [[ ${selection,,} == "x" ]]; then
             valid_selection=true
             echo -e "\n*******************************"
@@ -371,6 +375,21 @@ main_menu() {
             echo -e  "Invalid Selection '$selection' please try again."
         fi
     done
+}
+
+# -- power off the Pi (blue user: sudoers rule for 'systemctl poweroff' only, set up by the image) --
+shutdown_pi() {
+    echo
+    echo ' Shutting down ends all sessions on this ConsolePi (SSH, web terminal, Bluetooth, serial).'
+    read -ep ' Shut down ConsolePi now? (y/n) >> ' answer
+    [[ ${answer,,} =~ ^(y|yes|j|ja)$ ]] || return 0
+    echo ' Shutting down... wait until the green LED stops blinking (~20 s) before unplugging power.'
+    if ! sudo -n systemctl poweroff; then
+        echo ' Shutdown failed: this user needs sudo rights for "systemctl poweroff".'
+        read -p ' Press enter to continue '
+        return 0
+    fi
+    exit 0
 }
 
 exit_script() {
@@ -393,19 +412,12 @@ exit_script() {
 
 main() {
     get_tty_devices
-    if [[ $tty_list ]]; then # || [ -f $cloud_file ]; # then (disabling cloud local only for blue user)
-	    ttyusb_connected=true
-	else
-	    echo -e "\n*******************************\n"
-		echo -e "No USB to Serial adapters found"
-		echo -e "No Need to display Console Menu"
-		echo -e " 'consolepi-menu' to re-launch "
-		# echo -e "*******************************\n"
-		ttyusb_connected=false
-	fi
-    [[ $(picocom --help 2>>/dev/null | head -1) ]] && dep_installed=true ||
-	    ( echo "this program requires picocom, install picocom 'sudo apt-get install picocom' ... exiting" && dep_installed=false )
-    $ttyusb_connected && $dep_installed && main_menu || exit_script
+    # menu is shown without adapters too: refresh (r) and shut down (sd) are still useful
+    if ! command -v picocom >/dev/null; then
+        echo "this program requires picocom, install picocom 'sudo apt-get install picocom' ... exiting"
+        exit_script
+    fi
+    main_menu
 }
 
 # __main__
