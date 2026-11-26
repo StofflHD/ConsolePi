@@ -39,7 +39,7 @@ header() {
         echo -e "${_cyan}   CC:::::::::::::::Co:::::::::::::::o  n::::n    n::::ns::::::::::::::s o:::::::::::::::ol::::::l e::::::::eeeeeeee${_lred}P::::::::P          i::::::i";
         echo -e "${_cyan}     CCC::::::::::::C oo:::::::::::oo   n::::n    n::::n s:::::::::::ss   oo:::::::::::oo l::::::l  ee:::::::::::::e${_lred}P::::::::P          i::::::i";
         echo -e "${_cyan}        CCCCCCCCCCCCC   ooooooooooo     nnnnnn    nnnnnn  sssssssssss       ooooooooooo   llllllll    eeeeeeeeeeeeee${_lred}PPPPPPPPPP          iiiiiiii";
-        echo -e "${_blue}                                                     https://github.com/Pack3tL0ss/ConsolePi${_norm}";
+        echo -e "${_blue}                                                     https://github.com/StofflHD/ConsolePi${_norm}";
         echo "                                                                                                                                                ";
     else
         echo -e "${_cyan}   ______                       __    ${_lred} ____  _ "
@@ -47,7 +47,7 @@ header() {
         echo -e "${_cyan} / /   / __ \/ __ \/ ___/ __ \/ / _ \\\\${_lred}/ /_/ / / "
         echo -e "${_cyan}/ /___/ /_/ / / / (__  ) /_/ / /  __${_lred}/ ____/ /  "
         echo -e "${_cyan}\____/\____/_/ /_/____/\____/_/\___${_lred}/_/   /_/   "
-        echo -e "${_blue}  https://github.com/Pack3tL0ss/ConsolePi${_norm}"
+        echo -e "${_blue}  https://github.com/StofflHD/ConsolePi${_norm}"
         echo -e ""
     fi
 }
