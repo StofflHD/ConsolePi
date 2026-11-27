@@ -1,0 +1,8 @@
+[Unit]
+Description=ConsolePi: switch from the hotspot back to a known WiFi
+After=NetworkManager.service
+ConditionPathIsDirectory=/sys/class/ieee80211
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/consolepi-wifi-return

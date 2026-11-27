@@ -212,31 +212,23 @@ sh $T.sh && rm -f $T.sh
 echo "web terminal OK"
 EOF
 
-# -- hotspot portal (port 80): phones joining the hotspot get a page linking to the web terminal --------
-log "Installing hotspot portal"
-install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-portal" "$MNT/usr/local/sbin/"
-install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-portal.service" "$MNT/etc/systemd/system/"
-chroot "$MNT" systemctl enable consolepi-portal.service
-chroot "$MNT" /usr/local/sbin/consolepi-portal --write-dns-config
+# -- WiFi: power saving off, back from the hotspot to a known WiFi -------------------------------
+log "Installing WiFi power saving off + return from hotspot"
+install -D -m 0644 "$SCRIPT_DIR/rootfs/etc/NetworkManager/conf.d/consolepi-wifi-powersave.conf" \
+    "$MNT/etc/NetworkManager/conf.d/consolepi-wifi-powersave.conf"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-wifi-return" "$MNT/usr/local/sbin/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-wifi-return.service" \
+    "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-wifi-return.timer" "$MNT/etc/systemd/system/"
+chroot "$MNT" systemctl enable consolepi-wifi-return.timer
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
-grep -q '^address=/captive.apple.com/10.110.0.1$' /etc/NetworkManager/dnsmasq-shared.d/consolepi-portal.conf
-CONSOLEPI_PORTAL_PORT=8099 /usr/local/sbin/consolepi-portal & pid=$!
-sleep 2
-python3 - <<'PY'
-import http.client
-def get(host):
-    c = http.client.HTTPConnection("127.0.0.1", 8099, timeout=5)
-    c.request("GET", "/hotspot-detect.html", headers={"Host": host})
-    r = c.getresponse()
-    return r.status, r.getheader("Location"), r.read()
-s, _, body = get("captive.apple.com")
-assert s == 200 and b"Open web terminal" in body and b"https://127.0.0.1/" in body, (s, body[:200])
-s, loc, _ = get("127.0.0.1")
-assert s == 302 and loc == "https://127.0.0.1/", (s, loc)
-PY
-test "$(ps -o user= -p $pid)" = nobody
-kill $pid
-echo "portal OK"
+grep -qx 'wifi.powersave = 2' /etc/NetworkManager/conf.d/consolepi-wifi-powersave.conf
+bash -n /usr/local/sbin/consolepi-wifi-return
+command -v iw nmcli
+test -L /etc/systemd/system/timers.target.wants/consolepi-wifi-return.timer
+systemd-analyze verify /etc/systemd/system/consolepi-wifi-return.timer /etc/systemd/system/consolepi-wifi-return.service 2>&1 | grep -v 'Failed to\|NMClient\|dbus' || true
+# no NetworkManager in the chroot: must just exit quietly
+out=$(/usr/local/sbin/consolepi-wifi-return 2>&1); [ -z "$out" ] || { echo "$out"; exit 1; }
+echo "wifi return OK"
 EOF
 
 # -- Bluetooth pairing agent (BlueZ rejects pairing without one; rfcomm.service comes from the installer)
@@ -307,7 +299,7 @@ test -x /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck
 # all consolepi-* shell commands must at least parse
 for f in /etc/ConsolePi/src/consolepi-commands/*; do head -1 "$f" | grep -q bash && bash -n "$f"; done
 consolepi_status_svcs=$(grep '^ALL_SVCS=' /etc/ConsolePi/src/consolepi-commands/consolepi-status)
-for s in consolepi-bt-agent consolepi-web consolepi-portal; do echo "$consolepi_status_svcs" | grep -qw $s; done
+for s in consolepi-bt-agent consolepi-web consolepi-wifi-return.timer; do echo "$consolepi_status_svcs" | grep -qw $s; done
 echo "smoke test OK"
 EOF
 

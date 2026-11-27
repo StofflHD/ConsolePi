@@ -111,7 +111,7 @@ jobs:
           1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
           2. Re-plug the card, edit \`consolepi-setup.txt\` on the **bootfs** drive (user, password, WiFi), save.
           3. Boot, then open \`https://consolepi.local\` in a browser or \`ssh <user>@consolepi.local\`.
-             No WiFi in range: join the hotspot \`ConsolePi\` – the web terminal page opens by itself.
+             No WiFi in range: join the hotspot \`ConsolePi\` and open \`https://10.110.0.1\`.
 
           Full guide: [image/README.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/image/README.md)
 

@@ -64,8 +64,12 @@ Notes:
 * If no configured WiFi is in range the Pi opens its **hotspot**:
   * SSID `ConsolePi`, password `ConsolePiR0cks!!` unless set via `hotspot_ssid` / `hotspot_password`
   * the Pi is `10.110.0.1` → `ssh <user>@10.110.0.1`
-  * phones and laptops show a **sign-in page** right after joining (like hotel WiFi) with a button to
-    the web terminal. If it doesn't appear, open `http://10.110.0.1`.
+  * web terminal: `https://10.110.0.1`
+  * back to WiFi by itself: every 2 minutes the Pi checks for a known WiFi; when one is in range and
+    no device is connected to the hotspot, it switches back (timer `consolepi-wifi-return`;
+    off: `sudo systemctl disable --now consolepi-wifi-return.timer`)
+* WiFi power saving is off (`/etc/NetworkManager/conf.d/consolepi-wifi-powersave.conf`) - with it
+  the Pi's WiFi drops connections more often.
 * Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
 * Run `consolepi-menu` to connect to a serial device. `sd` in the menu shuts the Pi down when you're done.
 * If the power supply or power bank is too weak, the menu shows **`!! Under-voltage`** at the top
@@ -84,8 +88,6 @@ browser – phone, tablet or laptop, no app needed. Log in with your user and pa
 * Font size 16 px, "Rust" colour scheme (warm dark background, orange cursor). Other font size:
   `sudo systemctl edit consolepi-web`, add `[Service]` and `Environment=CONSOLEPI_WEB_FONT_SIZE=18`,
   then `sudo systemctl restart consolepi-web`. Colours: `/usr/local/sbin/consolepi-web-start`.
-* `http://…` is redirected to `https://…` (service `consolepi-portal`, port 80, which also serves the
-  hotspot sign-in page; off: `sudo systemctl disable --now consolepi-portal`).
 * Turn it off: `sudo systemctl disable --now consolepi-web`
 * Built on [ttyd](https://github.com/tsl0922/ttyd) (`/usr/local/bin/ttyd`, service `consolepi-web`).
 
