@@ -1038,7 +1038,7 @@ There are a few convenience commands created for ConsolePi during the automated 
 - `consolepi-btoff`: Stop advertising via BlueTooth.  Previously paired devices will still be able to Pair.
 - `consolepi-extras`: Launches optional [utilities installer](#consolepi-extras)
 - `consolepi-version`: Displays ConsolePi version (which is in the format YYYY-MajorRel.MinorRel)
-- `consolepi-autobaud`: Detects the baud rate of a serial console (`consolepi-autobaud /dev/ttyUSB0`), `--connect` then opens picocom with it. Menu shortcut: `a` + item number.
+- `consolepi-autobaud`: Detects the baud rate of a serial console and opens picocom with it (`consolepi-autobaud /dev/ttyUSB0`, `-n` only prints the rate). Menu shortcut: `a` + item number.
 - `consolepi-powercheck`: Prints a warning if the power supply is too weak (under-voltage now or since boot), nothing otherwise. Used by both menus. `consolepi-checkpower` shows all firmware throttle flags.
 - `consolepi-wlanreset`: Disables hotspot if enabled, disconnects from AP if connected as a station.  Then starts wpa_supplicant.  Otherwise attempts to reset WLAN adapter to initial bootup state, autohotspot will not run (use `consolepi-autohotspot` after reset to force autohotspot logic to run). *Pre-bookworm (wpa_supplicant/hostapd) only: on NetworkManager systems, like the ConsolePi image, the command just prints the nmcli equivalents.*
 - `consolepi-wlanscan`: Scan and display SSIDs visible to this ConsolePi, does not impact existing connection.

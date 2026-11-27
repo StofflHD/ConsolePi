@@ -76,7 +76,7 @@ Notes:
 * Unknown baud rate? Type **`a` + the number** in the menu (e.g. `a1`): the Pi tries the common rates
   (9600, 115200, 38400, 19200, 57600, 4800, 2400, 1200, 230400), sends Enter at each and connects with
   the one that answers in readable text. Silent devices can't be detected - then the configured rate
-  is used. On the command line: `consolepi-autobaud /dev/ttyUSB0`.
+  is used. On the command line: `consolepi-autobaud /dev/ttyUSB0` (`-n` only prints the rate).
 * If the power supply or power bank is too weak, the menu shows **`!! Under-voltage`** at the top
   (now, or "occurred since boot"). USB-serial adapters can drop out then – use a stronger supply or a
   shorter cable. Check any time: `/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck`.

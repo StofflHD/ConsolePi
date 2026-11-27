@@ -310,7 +310,7 @@ test -x /etc/ConsolePi/src/consolepi-commands/consolepi-autobaud
 python3 - <<'PY'
 import os, pty, subprocess
 m, s = pty.openpty()
-p = subprocess.run(["/etc/ConsolePi/src/consolepi-commands/consolepi-autobaud", os.ttyname(s), "--baud", "19200"],
+p = subprocess.run(["/etc/ConsolePi/src/consolepi-commands/consolepi-autobaud", os.ttyname(s), "-n", "--baud", "19200"],
                    capture_output=True, text=True, timeout=60)
 assert p.returncode == 2 and "no readable answer" in p.stdout and "19200" in p.stdout, (p.returncode, p.stdout, p.stderr)
 print("autobaud OK")

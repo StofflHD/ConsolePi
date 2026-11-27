@@ -5,10 +5,10 @@ For every rate the port is opened, Enter is sent and the reply is checked: at th
 readable text (a prompt, a login line), at a wrong rate it is garbage.  Devices that stay silent
 can't be detected - then the configured rate is used.
 
-    consolepi-autobaud /dev/ttyUSB0                  print the detected rate
-    consolepi-autobaud --connect /dev/ttyUSB0 [--baud 9600] [--flow n] [--databits 8] [--parity n]
+    consolepi-autobaud /dev/ttyUSB0 [--baud 9600] [--flow n] [--databits 8] [--parity n]
                                                      detect, then open picocom with that rate
                                                      (--baud: fallback if nothing answers)
+    consolepi-autobaud -n /dev/ttyUSB0               only print the detected rate
 
 Only uses the Python standard library (termios), no pyserial.
 """
@@ -159,7 +159,9 @@ def detect(dev: str, databits: int = 8, parity: str = "n", verbose: bool = True)
 def main() -> int:
     ap = argparse.ArgumentParser(description="Detect the baud rate of a serial console.")
     ap.add_argument("device")
-    ap.add_argument("--connect", action="store_true", help="open picocom with the detected rate")
+    ap.add_argument("-n", "--detect-only", action="store_true",
+                    help="only print the detected rate, don't open picocom")
+    ap.add_argument("--connect", action="store_true", help=argparse.SUPPRESS)   # default, kept for old callers
     ap.add_argument("--baud", type=int, default=9600, help="fallback rate if nothing readable answers")
     ap.add_argument("--flow", default="n", choices=["n", "x", "h"])
     ap.add_argument("--databits", type=int, default=8, choices=[5, 6, 7, 8])
@@ -179,7 +181,7 @@ def main() -> int:
         say(f"=> no readable answer - the device may be silent or off. Using {a.baud} baud.")
         rate = a.baud
 
-    if not a.connect:
+    if a.detect_only:
         return 0 if s >= MIN_SCORE else 2
     say("Press Enter once picocom is ready to see the prompt again.\n")
     cmd = ["picocom", a.device, "--baud", str(rate), "--flow", a.flow,
