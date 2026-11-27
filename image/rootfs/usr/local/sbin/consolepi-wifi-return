@@ -5,6 +5,8 @@
 # that for a wrong password), but it never leaves an active connection by itself - the Pi would stay
 # on the hotspot until reboot.  This switches back when
 #   - the WiFi device runs the hotspot (a connection in mode "ap"),
+#   - the hotspot has been up for 2 minutes (the WiFi has just failed: leave a window to join the
+#     hotspot instead of tearing it down right away),
 #   - no device is connected to the hotspot (nobody gets cut off mid-session), and
 #   - a known WiFi (saved, autoconnect on) is in range.
 # After a failed attempt it waits 10 minutes before trying again.
@@ -15,6 +17,8 @@ set -u
 
 FAILED="${CONSOLEPI_WIFI_RETURN_STATE:-/run/consolepi-wifi-return.failed}"
 RETRY_AFTER=600
+SINCE="${CONSOLEPI_WIFI_RETURN_SINCE:-/run/consolepi-wifi-return.hotspot}"   # "<activation> <first seen>"
+HOTSPOT_MIN="${CONSOLEPI_WIFI_RETURN_HOTSPOT_MIN:-120}"
 DRY="${CONSOLEPI_WIFI_RETURN_DRYRUN:-}"
 
 mode_of() { nmcli -g 802-11-wireless.mode connection show "$1" 2>/dev/null; }
@@ -23,9 +27,19 @@ dev=$(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2=="wifi"{print $1;
 [ -n "$dev" ] || exit 0
 
 # active connection on the WiFi device (UUIDs: names may contain anything)
-hotspot=$(nmcli -t -f UUID,DEVICE connection show --active 2>/dev/null | awk -F: -v d="$dev" '$2==d{print $1; exit}')
-[ -n "$hotspot" ] || exit 0          # nothing active: NetworkManager is (re)connecting by itself
+read -r hotspot apath < <(nmcli -t -f UUID,DEVICE,ACTIVE-PATH connection show --active 2>/dev/null |
+                          awk -F: -v d="$dev" '$2==d{print $1, $3; exit}')
+[ -n "${hotspot:-}" ] || exit 0      # nothing active: NetworkManager is (re)connecting by itself
 [ "$(mode_of "$hotspot")" = "ap" ] || exit 0
+
+# how long has this hotspot activation been up?  (every activation gets a new D-Bus path)
+now=$(date +%s)
+read -r seen_path seen_at < "$SINCE" 2>/dev/null || true
+if [ "${seen_path:-}" != "${apath:-}" ] || [ -z "${seen_at:-}" ]; then
+    echo "${apath:-} $now" > "$SINCE"
+    seen_at=$now
+fi
+[ $(( now - seen_at )) -lt "$HOTSPOT_MIN" ] && exit 0
 
 clients=$(iw dev "$dev" station dump 2>/dev/null | grep -c '^Station')
 [ "${clients:-0}" -gt 0 ] && exit 0  # someone uses the hotspot: stay
