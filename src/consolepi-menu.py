@@ -28,6 +28,7 @@ from consolepi import log, utils, config  # type: ignore # NoQA
 MIN_WIDTH = 55
 MAX_COLS = 5
 MENU_LAUNCHER = "/etc/ConsolePi/src/consolepi-menu.py"
+AUTOBAUD = "/etc/ConsolePi/src/consolepi-commands/consolepi-autobaud"
 
 
 class Actions():
@@ -84,6 +85,7 @@ class ConsolePiMenu(Rename):
             'tp': ['tp', 'Toggle Display of associated TELNET ports'],
             'con': ['c', 'Change Default Serial Settings (devices marked with ** only)'],
             'picohelp': ['h', 'Display Picocom Help'],
+            'autobaud': ['a#', 'Auto-detect baud, then connect (e.g. a1)'],
             'back': ['b', 'Back'],
             'x': ['x', 'Exit']
         }
@@ -836,6 +838,11 @@ class ConsolePiMenu(Rename):
                 if not rename:
                     menu_actions[str(item)] = {'cmd': _cmd, 'pwr_key': dev,
                                                'pre_msg': f"Connecting To {dev_pretty}..."}
+                    # a<item>: detect the baud rate first, then connect (consolepi-autobaud runs picocom)
+                    menu_actions['a' + str(item)] = {
+                        'cmd': f'{AUTOBAUD} --connect {dev} --baud {baud} --flow {flow} '
+                               f'--databits {dbits} --parity {parity}',
+                        'pwr_key': dev, 'pre_msg': f"Connecting To {dev_pretty} (auto baud)..."}
                 else:
                     rn_this = {dev: adapters[dev]}
                     menu_actions[str(item)] = {'function': self.do_rename_adapter, 'args': [dev]}
@@ -1068,6 +1075,8 @@ class ConsolePiMenu(Rename):
                 outer_body.append(mlines)
                 slines.append(g)
 
+        if loc:
+            foot_opts.append('autobaud')
         if loc or remotes.connected:
             foot_opts.append('picohelp')
             foot_opts.append('tp')

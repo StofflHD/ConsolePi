@@ -193,6 +193,15 @@ install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-web.service" "$
 install -m 0644 "$SCRIPT_DIR/rootfs/etc/profile.d/zz-consolepi-web.sh" "$MNT/etc/profile.d/"
 chroot "$MNT" systemctl enable consolepi-web.service
 chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+# dtach: web terminal sessions survive a lost connection (see /etc/profile.d/zz-consolepi-web.sh)
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y -qq --no-install-recommends dtach || { apt-get update -qq && apt-get install -y -qq --no-install-recommends dtach; }
+command -v dtach
+T=$(mktemp -d)
+dtach -n $T/s.sock -E -z sleep 30
+test -S $T/s.sock
+pkill -f "sleep 30" || true
+rm -rf $T
 /usr/local/bin/ttyd --version
 T=$(mktemp -d)
 CONSOLEPI_WEB_DIR=$T/web /usr/local/sbin/consolepi-web-cert
@@ -296,6 +305,16 @@ echo "$out" | tail -5
 echo "$out" | grep -qE 'ModuleNotFoundError|ImportError' && { echo "consolepi-menu imports broken"; exit 1; }
 test -x /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck
 /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck || true   # no firmware in the chroot: must not fail
+# auto baud: on a pty nobody answers -> "no readable answer", exit 2, falls back to --baud
+test -x /etc/ConsolePi/src/consolepi-commands/consolepi-autobaud
+python3 - <<'PY'
+import os, pty, subprocess
+m, s = pty.openpty()
+p = subprocess.run(["/etc/ConsolePi/src/consolepi-commands/consolepi-autobaud", os.ttyname(s), "--baud", "19200"],
+                   capture_output=True, text=True, timeout=60)
+assert p.returncode == 2 and "no readable answer" in p.stdout and "19200" in p.stdout, (p.returncode, p.stdout, p.stderr)
+print("autobaud OK")
+PY
 # all consolepi-* shell commands must at least parse
 for f in /etc/ConsolePi/src/consolepi-commands/*; do head -1 "$f" | grep -q bash && bash -n "$f"; done
 consolepi_status_svcs=$(grep '^ALL_SVCS=' /etc/ConsolePi/src/consolepi-commands/consolepi-status)

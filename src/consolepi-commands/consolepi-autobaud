@@ -1,0 +1,157 @@
+#!/usr/bin/python3
+"""ConsolePi: find the baud rate of a serial console by trying the common rates.
+
+For every rate the port is opened, Enter is sent and the reply is checked: at the right rate it is
+readable text (a prompt, a login line), at a wrong rate it is garbage.  Devices that stay silent
+can't be detected - then the configured rate is used.
+
+    consolepi-autobaud /dev/ttyUSB0                  print the detected rate
+    consolepi-autobaud --connect /dev/ttyUSB0 [--baud 9600] [--flow n] [--databits 8] [--parity n]
+                                                     detect, then open picocom with that rate
+                                                     (--baud: fallback if nothing answers)
+
+Only uses the Python standard library (termios), no pyserial.
+"""
+import argparse
+import errno
+import os
+import select
+import sys
+import termios
+import time
+
+# most common first: the search stops early at a clearly readable answer
+RATES = [9600, 115200, 38400, 19200, 57600, 4800, 2400, 1200, 230400]
+READABLE = set(range(0x20, 0x7F)) | {0x09, 0x0A, 0x0D, 0x1B}
+GOOD = 0.95          # readable share that ends the search right away
+MIN_SCORE = 0.80     # below this no rate is trusted
+CSIZE = {5: termios.CS5, 6: termios.CS6, 7: termios.CS7, 8: termios.CS8}
+
+
+def say(msg: str) -> None:
+    print(msg, flush=True)      # stdout: the menu captures stderr for its error handling
+
+
+def lock_files(dev: str) -> list:
+    names = {os.path.basename(dev), os.path.basename(os.path.realpath(dev))}
+    return [f"{d}/LCK..{n}" for d in ("/var/lock", "/run/lock") for n in names]
+
+
+def in_use(dev: str) -> str:
+    for f in lock_files(dev):
+        try:
+            pid = int(open(f).read().split()[0])
+        except (OSError, ValueError, IndexError):
+            continue
+        try:
+            os.kill(pid, 0)
+            return f"in use (lock {f}, pid {pid})"
+        except ProcessLookupError:
+            continue                 # stale lock
+        except PermissionError:
+            return f"in use (lock {f}, pid {pid})"
+    return ""
+
+
+def configure(fd: int, rate: int, databits: int, parity: str) -> None:
+    speed = getattr(termios, f"B{rate}")
+    attrs = termios.tcgetattr(fd)
+    iflag, oflag, cflag, lflag = 0, 0, termios.CREAD | termios.CLOCAL | CSIZE[databits], 0
+    if parity in ("e", "o"):
+        cflag |= termios.PARENB | (termios.PARODD if parity == "o" else 0)
+    cc = attrs[6]
+    cc[termios.VMIN] = 0
+    cc[termios.VTIME] = 0
+    termios.tcsetattr(fd, termios.TCSANOW, [iflag, oflag, cflag, lflag, speed, speed, cc])
+    termios.tcflush(fd, termios.TCIOFLUSH)
+
+
+def read_reply(fd: int, total: float = 0.8, quiet: float = 0.25) -> bytes:
+    data = b""
+    end = time.monotonic() + total
+    last = None
+    while True:
+        now = time.monotonic()
+        if now >= end or (last and now - last >= quiet):
+            return data
+        r, _, _ = select.select([fd], [], [], min(0.05, end - now))
+        if r:
+            try:
+                chunk = os.read(fd, 4096)
+            except BlockingIOError:
+                chunk = b""
+            if chunk:
+                data += chunk
+                last = time.monotonic()
+                if len(data) > 2048:
+                    return data
+
+
+def score(data: bytes) -> float:
+    if len(data) < 2:
+        return 0.0
+    return sum(b in READABLE for b in data) / len(data)
+
+
+def detect(dev: str, databits: int = 8, parity: str = "n", verbose: bool = True):
+    """Returns (rate, score) of the best rate, or (None, 0) if nothing readable answered."""
+    try:
+        fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    except OSError as e:
+        raise SystemExit(f"{dev}: {e.strerror}" + (" (in use?)" if e.errno == errno.EBUSY else ""))
+    best = (None, 0.0)
+    try:
+        for rate in RATES:
+            configure(fd, rate, databits, parity)
+            data = b""
+            for _ in range(2):                       # some devices only answer the second Enter
+                os.write(fd, b"\r")
+                data += read_reply(fd)
+                if len(data) >= 2:
+                    break
+            s = score(data)
+            if verbose:
+                shown = "no answer" if not data else f"{len(data)} bytes, {s:.0%} readable"
+                say(f"  {rate:>6}: {shown}")
+            if s > best[1]:
+                best = (rate, s)
+            if s >= GOOD and len(data) >= 3:
+                break
+    finally:
+        os.close(fd)
+    return best if best[1] >= MIN_SCORE else (None, best[1])
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Detect the baud rate of a serial console.")
+    ap.add_argument("device")
+    ap.add_argument("--connect", action="store_true", help="open picocom with the detected rate")
+    ap.add_argument("--baud", type=int, default=9600, help="fallback rate if nothing readable answers")
+    ap.add_argument("--flow", default="n", choices=["n", "x", "h"])
+    ap.add_argument("--databits", type=int, default=8, choices=[5, 6, 7, 8])
+    ap.add_argument("--parity", default="n", choices=["n", "e", "o"])
+    a = ap.parse_args()
+
+    busy = in_use(a.device)
+    if busy:
+        print(f"{a.device}: {busy} - close the other session first", file=sys.stderr)
+        return 1
+
+    say(f"Detecting the baud rate on {a.device} (sends Enter at each rate) ...")
+    rate, s = detect(a.device, a.databits, a.parity)
+    if rate:
+        say(f"=> {rate} baud ({s:.0%} readable)")
+    else:
+        say(f"=> no readable answer - the device may be silent or off. Using {a.baud} baud.")
+        rate = a.baud
+
+    if not a.connect:
+        return 0 if s >= MIN_SCORE else 2
+    say("Press Enter once picocom is ready to see the prompt again.\n")
+    cmd = ["picocom", a.device, "--baud", str(rate), "--flow", a.flow,
+           "--databits", str(a.databits), "--parity", a.parity]
+    os.execvp(cmd[0], cmd)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

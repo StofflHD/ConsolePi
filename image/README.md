@@ -73,6 +73,10 @@ Notes:
   the Pi's WiFi drops connections more often.
 * Otherwise: `ssh <user>@consolepi.local` (or the IP from your router).
 * Run `consolepi-menu` to connect to a serial device. `sd` in the menu shuts the Pi down when you're done.
+* Unknown baud rate? Type **`a` + the number** in the menu (e.g. `a1`): the Pi tries the common rates
+  (9600, 115200, 38400, 19200, 57600, 4800, 2400, 1200, 230400), sends Enter at each and connects with
+  the one that answers in readable text. Silent devices can't be detected - then the configured rate
+  is used. On the command line: `consolepi-autobaud /dev/ttyUSB0`.
 * If the power supply or power bank is too weak, the menu shows **`!! Under-voltage`** at the top
   (now, or "occurred since boot"). USB-serial adapters can drop out then – use a stronger supply or a
   shorter cable. Check any time: `/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck`.
@@ -82,6 +86,11 @@ Notes:
 Open **`https://consolepi.local`** (or `https://10.110.0.1` on the hotspot, or the Pi's IP) in any
 browser – phone, tablet or laptop, no app needed. Log in with your user and password, and
 `consolepi-menu` opens right away. Leaving the menu gives you a normal shell; `exit` ends the session.
+
+* **The session survives a lost connection** (WiFi gone, page reloaded, tab or laptop closed): log in
+  again and you are back where you were, a running serial connection included. It only ends with
+  `exit`, so end it when you're done - otherwise the serial port stays in use by it. Several tabs of
+  the same user share one session. (Built on `dtach`, see `/etc/profile.d/zz-consolepi-web.sh`.)
 
 * The certificate is self-signed (created on the Pi's first boot, unique per Pi), so the browser
   warns once – accept it (*Advanced → Proceed*).
