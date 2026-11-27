@@ -89,11 +89,32 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/image-v')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history + tags for the list of changes
+
       - uses: actions/download-artifact@v4
         with:
           pattern: consolepi-image-*
           merge-multiple: true
           path: out
+
+      - name: List changes since the previous release
+        run: |
+          # previous image-v* tag in version order (image-v0.1.10 comes after image-v0.1.9)
+          prev=$(git tag -l 'image-v*' --sort=-v:refname | grep -A1 -Fx "$GITHUB_REF_NAME" | sed -n 2p)
+          {
+            if [ -n "$prev" ]; then
+              echo "**Changes since $prev**"
+              echo
+              git log --no-merges --format='- %s' "$prev..$GITHUB_REF_NAME" -- . ':!.github/dependabot.yml' | grep -v '^- Bump ' || echo "- (no code changes)"
+              echo
+              echo "Full diff: https://github.com/${GITHUB_REPOSITORY}/compare/${prev}...${GITHUB_REF_NAME}"
+            else
+              echo "**First image release**"
+            fi
+          } > "$RUNNER_TEMP/changes.md"
+          cat "$RUNNER_TEMP/changes.md"
 
       - name: Publish release
         env:
@@ -106,6 +127,8 @@ jobs:
           Raspberry Pi OS Lite (64 bit) with ConsolePi pre-installed – Pi Zero 2 W, 3B/3B+, 4, 400, 5.
 
           Base: Raspberry Pi OS 13 (trixie).
+
+          $(cat "$RUNNER_TEMP/changes.md")
 
           **Quick start**
           1. Write the \`.img.xz\` with Raspberry Pi Imager (*Use custom*) or balenaEtcher.
