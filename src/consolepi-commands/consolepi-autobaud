@@ -93,22 +93,55 @@ def score(data: bytes) -> float:
     return sum(b in READABLE for b in data) / len(data)
 
 
-def detect(dev: str, databits: int = 8, parity: str = "n", verbose: bool = True):
-    """Returns (rate, score) of the best rate, or (None, 0) if nothing readable answered."""
+def open_port(dev: str) -> int:
     try:
-        fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+        return os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     except OSError as e:
         raise SystemExit(f"{dev}: {e.strerror}" + (" (in use?)" if e.errno == errno.EBUSY else ""))
+
+
+def probe(fd: int, rate: int, databits: int, parity: str) -> bytes:
+    configure(fd, rate, databits, parity)
+    data = b""
+    for _ in range(2):                           # some devices only answer the second Enter
+        try:
+            os.write(fd, b"\r")
+        except BlockingIOError:                  # output still busy: just listen
+            pass
+        data += read_reply(fd)
+        if len(data) >= 2:
+            break
+    return data
+
+
+def detect(dev: str, databits: int = 8, parity: str = "n", verbose: bool = True):
+    """Returns (rate, score) of the best rate, or (None, 0) if nothing readable answered."""
+    fd = open_port(dev)
     best = (None, 0.0)
+    errors = 0
     try:
         for rate in RATES:
-            configure(fd, rate, databits, parity)
-            data = b""
-            for _ in range(2):                       # some devices only answer the second Enter
-                os.write(fd, b"\r")
-                data += read_reply(fd)
-                if len(data) >= 2:
+            try:
+                data = probe(fd, rate, databits, parity)
+            except (OSError, termios.error) as e:
+                # some USB adapters refuse a rate (EIO / EINVAL) or hang up the port:
+                # skip that rate and carry on with the port opened anew
+                msg = e.strerror if isinstance(e, OSError) else (e.args[-1] if e.args else e)
+                if verbose:
+                    say(f"  {rate:>6}: not usable ({msg})")
+                errors += 1
+                os.close(fd)
+                fd = -1
+                if errors >= 3:
+                    say("  too many errors - giving up (adapter unplugged or disconnected?)")
                     break
+                time.sleep(0.5)
+                try:
+                    fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+                except OSError as e2:
+                    say(f"  can't open {dev} again: {e2.strerror} (adapter unplugged?)")
+                    break
+                continue
             s = score(data)
             if verbose:
                 shown = "no answer" if not data else f"{len(data)} bytes, {s:.0%} readable"
@@ -118,7 +151,8 @@ def detect(dev: str, databits: int = 8, parity: str = "n", verbose: bool = True)
             if s >= GOOD and len(data) >= 3:
                 break
     finally:
-        os.close(fd)
+        if fd >= 0:
+            os.close(fd)
     return best if best[1] >= MIN_SCORE else (None, best[1])
 
 
