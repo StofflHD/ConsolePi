@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ALL_SVCS=(autohotspot consolepi-mdnsbrowse consolepi-mdnsreg consolepi-api consolepi-wired-dhcp consolepi-autohotspot-dhcp dnsmasq hostapd ser2net rfcomm bluetooth.service)
+ALL_SVCS=(autohotspot consolepi-mdnsbrowse consolepi-mdnsreg consolepi-api consolepi-wired-dhcp consolepi-autohotspot-dhcp dnsmasq hostapd ser2net rfcomm bluetooth.service consolepi-bt-agent consolepi-web consolepi-portal)
 RELOAD_SVCS=("consolepi-mdnsbrowse" "consolepi-mdnsreg" "consolepi-api" "ser2net")
 systemctl is-enabled consolepi-gpiofan >/dev/null 2>&1 && ALL_SVCS+=('consolepi-gpiofan')
 

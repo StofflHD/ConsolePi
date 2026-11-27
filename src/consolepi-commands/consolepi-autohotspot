@@ -1,3 +1,13 @@
 #!/usr/bin/env bash
 
+# NetworkManager systems (Raspberry Pi OS 12+, the ConsolePi image): WiFi and hotspot are run by
+# NetworkManager, this pre-bookworm script (wpa_supplicant/hostapd) would only get in its way
+if systemctl -q is-active NetworkManager 2>/dev/null; then
+    echo "Not needed here: NetworkManager manages WiFi and the hotspot."
+    echo "  WiFi status:            nmcli device status"
+    echo "  try the hotspot:        consolepi-testhotspot   (run again to switch back)"
+    echo "  reconnect WiFi:         sudo nmcli device connect wlan0"
+    exit 0
+fi
+
 sudo /etc/ConsolePi/src/autohotspotN "$@"

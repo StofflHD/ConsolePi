@@ -304,6 +304,10 @@ echo "$out" | tail -5
 echo "$out" | grep -qE 'ModuleNotFoundError|ImportError' && { echo "consolepi-menu imports broken"; exit 1; }
 test -x /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck
 /etc/ConsolePi/src/consolepi-commands/consolepi-powercheck || true   # no firmware in the chroot: must not fail
+# all consolepi-* shell commands must at least parse
+for f in /etc/ConsolePi/src/consolepi-commands/*; do head -1 "$f" | grep -q bash && bash -n "$f"; done
+consolepi_status_svcs=$(grep '^ALL_SVCS=' /etc/ConsolePi/src/consolepi-commands/consolepi-status)
+for s in consolepi-bt-agent consolepi-web consolepi-portal; do echo "$consolepi_status_svcs" | grep -qw $s; done
 echo "smoke test OK"
 EOF
 

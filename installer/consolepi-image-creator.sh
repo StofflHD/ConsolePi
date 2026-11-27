@@ -136,7 +136,7 @@ header() {
     echo -e "${_cyan} / /   / __ \/ __ \/ ___/ __ \/ / _ \\\\${_lred}/ /_/ / / "
     echo -e "${_cyan}/ /___/ /_/ / / / (__  ) /_/ / /  __${_lred}/ ____/ /  "
     echo -e "${_cyan}\____/\____/_/ /_/____/\____/_/\___${_lred}/_/   /_/   "
-    echo -e "${_blue}  https://github.com/Pack3tL0ss/ConsolePi${_norm}"
+    echo -e "${_blue}  https://github.com/StofflHD/ConsolePi${_norm}"
     echo -e ""
 }
 
@@ -876,7 +876,7 @@ main() {
             echo 'sudo ls -1 /root/.ssh | grep -q id_rsa.pub || ( sudo ssh-keygen && sudo ssh-copy-id wade@consolepi-dev )' >> $auto_install_file
             echo 'sftp wade@consolepi-dev:/etc/ConsolePi/installer/install.sh /tmp/ConsolePi && sudo bash /tmp/ConsolePi "${@}" && sudo rm -f /tmp/ConsolePi' >> $auto_install_file
         else
-            echo 'wget -q https://raw.githubusercontent.com/Pack3tL0ss/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi "${@}" && sudo rm -f /tmp/ConsolePi' >> $auto_install_file
+            echo 'wget -q https://raw.githubusercontent.com/StofflHD/ConsolePi/master/installer/install.sh -O /tmp/ConsolePi && sudo bash /tmp/ConsolePi "${@}" && sudo rm -f /tmp/ConsolePi' >> $auto_install_file
         fi
 
         $LOCAL_DEV && cmd_line="--dev ${cmd_line#"--dev "}"
