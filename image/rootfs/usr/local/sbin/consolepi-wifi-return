@@ -1,5 +1,5 @@
 #!/bin/bash
-# ConsolePi: back from the hotspot to a known WiFi (run every 2 minutes by consolepi-wifi-return.timer).
+# ConsolePi: back from the hotspot to a known WiFi (run every minute by consolepi-wifi-return.timer).
 #
 # NetworkManager falls back to the hotspot when the WiFi is lost (or one handshake fails and it takes
 # that for a wrong password), but it never leaves an active connection by itself - the Pi would stay

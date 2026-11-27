@@ -65,7 +65,7 @@ Notes:
   * SSID `ConsolePi`, password `ConsolePiR0cks!!` unless set via `hotspot_ssid` / `hotspot_password`
   * the Pi is `10.110.0.1` → `ssh <user>@10.110.0.1`
   * web terminal: `https://10.110.0.1`
-  * back to WiFi by itself: every 2 minutes the Pi checks for a known WiFi; when one is in range and
+  * back to WiFi by itself: every minute the Pi checks for a known WiFi; when one is in range and
     no device is connected to the hotspot, it switches back (timer `consolepi-wifi-return`;
     off: `sudo systemctl disable --now consolepi-wifi-return.timer`)
 * WiFi power saving is off (`/etc/NetworkManager/conf.d/consolepi-wifi-powersave.conf`) - with it

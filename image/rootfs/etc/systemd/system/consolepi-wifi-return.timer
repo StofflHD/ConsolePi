@@ -1,9 +1,9 @@
 [Unit]
-Description=ConsolePi: every 2 minutes, switch from an unused hotspot back to a known WiFi
+Description=ConsolePi: every minute, switch from an unused hotspot back to a known WiFi
 
 [Timer]
 OnBootSec=3min
-OnUnitActiveSec=2min
+OnUnitActiveSec=1min
 AccuracySec=15s
 
 [Install]
