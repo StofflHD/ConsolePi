@@ -1,6 +1,6 @@
 [Unit]
 Description=Browse for remote ConsolePis via mdns and update local cache
-Documentation=https://github.com/Pack3tL0ss/ConsolePi
+Documentation=https://github.com/StofflHD/ConsolePi
 DefaultDependencies=no
 Wants=consolepi-mdnsreg.service
 After=consolepi-mdnsreg.service

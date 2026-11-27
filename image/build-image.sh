@@ -325,6 +325,11 @@ if [ -n "\$first_user" ]; then
     done
 fi
 
+# git: /etc/ConsolePi belongs to another user than whoever logs in (the installer only allows it
+# per user, but the image's users are made later by consolepi-setup) -> allow it for everyone
+git config --system --get-all safe.directory | grep -qx /etc/ConsolePi || git config --system --add safe.directory /etc/ConsolePi
+runuser -u nobody -- git -C /etc/ConsolePi log -1 --format='git safe.directory OK (%cd)'
+
 # SSH on, host keys are regenerated on first boot
 systemctl enable ssh
 rm -f /etc/ssh/ssh_host_*

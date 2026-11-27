@@ -1,6 +1,6 @@
 [Unit]
 Description=Cleanup ConsolePi temp files on boot.
-Documentation=https://github.com/Pack3tL0ss/ConsolePi
+Documentation=https://github.com/StofflHD/ConsolePi
 After=multi-user.target
 
 [Service]

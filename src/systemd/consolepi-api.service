@@ -1,6 +1,6 @@
 [Unit]
 Description=ConsolePi API: facilitates ConsolePis sharing info in Cluster
-Documentation=https://github.com/Pack3tL0ss/ConsolePi
+Documentation=https://github.com/StofflHD/ConsolePi
 DefaultDependencies=no
 After=network-online.target
 Wants=network-online.target

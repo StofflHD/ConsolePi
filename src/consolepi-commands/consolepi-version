@@ -6,7 +6,7 @@ echo -e "${_cyan}  / ____/___  ____  _________  / /__  ${_lred}/ __ \(_)"
 echo -e "${_cyan} / /   / __ \/ __ \/ ___/ __ \/ / _ \\\\${_lred}/ /_/ / / "
 echo -e "${_cyan}/ /___/ /_/ / / / (__  ) /_/ / /  __${_lred}/ ____/ /  "
 echo -e "${_cyan}\____/\____/_/ /_/____/\____/_/\___${_lred}/_/   /_/   "
-echo -e "${_blue}  https://github.com/Pack3tL0ss/ConsolePi${_norm}"
+echo -e "${_blue}  https://github.com/StofflHD/ConsolePi${_norm}"
 echo -e ""
 VER=$(grep 'CONSOLEPI_VER:' /etc/ConsolePi/.static.yaml 2>/dev/null| awk '{print $2}')
 INSTALLER_VER=$(grep 'INSTALLER_VER:' /etc/ConsolePi/.static.yaml 2>/dev/null| awk '{print $2}')
@@ -14,10 +14,10 @@ INSTALLER_VER=$(grep 'INSTALLER_VER:' /etc/ConsolePi/.static.yaml 2>/dev/null| a
 printf "ConsolePi Version: %s Installer Version %s \n" $VER $INSTALLER_VER
 echo -e "  - Versioning Style is YYYY-major.minor\n"
 pushd $consolepi_dir >/dev/null
-echo "Your current commit is dated$( git log -1 | grep Date: | cut -d' ' -f2-  )"
+echo "Your current commit is dated$( git -c safe.directory=/etc/ConsolePi log -1 | grep Date: | cut -d' ' -f2-  )"
 # until I sort permissions or create a wrapper try non-sudo then sudo
-git fetch >/dev/null 2>&1 || sudo git fetch >/dev/null 2>&1
-git status | head -2 | tail -1
+git -c safe.directory=/etc/ConsolePi fetch >/dev/null 2>&1 || sudo git -c safe.directory=/etc/ConsolePi fetch >/dev/null 2>&1
+git -c safe.directory=/etc/ConsolePi status | head -2 | tail -1
 popd >/dev/null
 echo
 echo -e "use ${_cyan}consolepi-help${_norm} for a list of commands (${_cyan}consolepi-menu${_norm} being the main one)"
