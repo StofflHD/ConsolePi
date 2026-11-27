@@ -20,6 +20,11 @@ else
         echo "Launching ConsolePi Serial Console Menu"
     fi
     sudo /etc/ConsolePi/src/consolepi-menu.py "${@}"; rt=$?
+    # left the menu with x: clear it and show the ConsolePi logo + hints, like at login
+    if [[ ${rt} == 0 ]] && [ -z "$1" ] && [ -t 1 ] && [ -f /etc/ConsolePi/src/consolepi.sh ]; then
+        clear
+        bash /etc/ConsolePi/src/consolepi.sh
+    fi
 fi
 
 if [[ ${rt} != 0 ]] && [[ "$1" != 'sh' ]] ; then
