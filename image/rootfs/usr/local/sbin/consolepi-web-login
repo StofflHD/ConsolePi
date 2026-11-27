@@ -2,10 +2,13 @@
 # started by ttyd for every browser session: normal system login (PAM, same users/passwords as
 # SSH), the marker makes /etc/profile.d/zz-consolepi-web.sh open consolepi-menu after login.
 #
-# Works like a getty: after 'exit' (or a failed login) the login prompt comes back, instead of
-# ttyd closing the connection.  login hangs up the terminal (vhangup) when it starts, so it runs
-# in its own session (setsid -c) and every round opens the terminal anew.  Closing the browser tab
-# still ends everything: ttyd sends SIGHUP, the trap passes it on.
+# Works like a getty: after 'exit' (or a failed / timed out login) it waits for Enter and shows the
+# login prompt again, instead of ttyd closing the connection.  Waiting for Enter keeps an idle tab
+# quiet: login itself gives up after 60 s, and restarting it right away filled the page with
+# "timed out" lines (and the journal with failed logins).
+# login hangs up the terminal (vhangup) when it starts, so it runs in its own session (setsid -c)
+# and every round opens the terminal anew.  Closing the browser tab still ends everything: ttyd
+# sends SIGHUP, the trap passes it on.
 export CONSOLEPI_WEB=1
 tty=$(tty) || exec /bin/login -p
 pid=
@@ -15,6 +18,8 @@ while :; do
     pid=$!
     wait "$pid"
     pid=
-    printf '\r\n' >"$tty" 2>/dev/null || exit 0
-    sleep 1
+    stty sane <"$tty" 2>/dev/null
+    # clear the page, then wait (no time limit) until someone presses Enter
+    printf '\033[H\033[2J\033[3J%s web terminal - press Enter to log in ' "$(hostname)" >"$tty" 2>/dev/null || exit 0
+    read -r _ <"$tty" || exit 0
 done
