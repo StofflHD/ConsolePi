@@ -82,6 +82,16 @@ Notes:
 * If the power supply or power bank is too weak, the menu shows **`!! Under-voltage`** at the top
   (now, or "occurred since boot"). USB-serial adapters can drop out then – use a stronger supply or a
   shorter cable. Check any time: `/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck`.
+* **PiSugar 3 battery board** (Pi Zero 2 W, also Pi 3/4 with the Plus model): just attach it, nothing to
+  install. The image finds it on boot and then
+  * shows the battery level in the menu and the login banner (`!! Battery low` below 20 % on battery),
+  * shuts the Pi down cleanly at 10 % battery – change it with `battery_shutdown=` in
+    `consolepi-setup.txt` (0 = never),
+  * powers the Pi off on a long press of the PiSugar button,
+  * sets the clock from the PiSugar's RTC when there is no network time (logs keep the right time).
+
+  Check: `consolepi-battery`, details: `journalctl -u consolepi-pisugar`. The PiSugar web UI is off;
+  without a PiSugar nothing of this runs.
 
 ## Web terminal (browser access, like AirConsole)
 

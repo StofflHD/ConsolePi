@@ -1,0 +1,13 @@
+[Unit]
+Description=ConsolePi PiSugar 3 battery board (detect, start pisugar-server, clock from RTC)
+Documentation=https://github.com/StofflHD/ConsolePi
+After=local-fs.target systemd-modules-load.service
+Before=consolepi-web.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/consolepi-pisugar boot
+
+[Install]
+WantedBy=multi-user.target

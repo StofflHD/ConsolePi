@@ -39,6 +39,9 @@ OUT_DIR="$(realpath -m "${OUT_DIR:-./out}")"
 WORK_DIR="$(realpath -m "${WORK_DIR:-./work}")"
 TTYD_VERSION=1.7.7
 TTYD_SHA256=b38acadd89d1d396a0f5649aa52c539edbad07f4bc7348b27b4f4b7219dd4165   # ttyd.aarch64 from the release's SHA256SUMS
+PISUGAR_VERSION=2.4.1   # PiSugar 3 battery board: pisugar-server + pisugar-poweroff .debs from the GitHub release
+PISUGAR_SERVER_SHA256=9d5e70a7f3f541c01cafce8948571c0a7b1c24f86c3c5a2043c50ca2bd76d4a3
+PISUGAR_POWEROFF_SHA256=652ae5a97bc37c93bffe49eff6f639d9b88ea9033087bab1db6f918c40a4289e
 EXTRA_MB=2048  # space added to the root fs for ConsolePi (venv, deps).  RPi OS grows the fs to the card on first boot.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -267,6 +270,85 @@ sudo -l -U blue | grep -q '/usr/bin/systemctl poweroff'
 bash -n /etc/ConsolePi/src/consolepi-menu.sh
 grep -q 'shutdown_pi' /etc/ConsolePi/src/consolepi-menu.sh
 echo "bluetooth agent OK"
+EOF
+
+# -- PiSugar 3 battery board: battery level, safe shutdown, button, RTC ---------------------------
+# pisugar-server is installed but stays off; consolepi-pisugar switches it on at boot when a PiSugar
+# answers on I2C.  Web UI off, TCP only on localhost: only local programs (consolepi-battery) use it.
+log "Installing PiSugar 3 support (pisugar-server ${PISUGAR_VERSION})"
+for pkg in pisugar-server pisugar-poweroff; do
+    curl -sSLf -o "$MNT/tmp/${pkg}.deb" \
+        "https://github.com/PiSugar/pisugar-power-manager-rs/releases/download/v${PISUGAR_VERSION}/${pkg}_${PISUGAR_VERSION}-1_arm64.deb"
+done
+echo "${PISUGAR_SERVER_SHA256}  $MNT/tmp/pisugar-server.deb" | sha256sum -c - || die "checksum mismatch for pisugar-server"
+echo "${PISUGAR_POWEROFF_SHA256}  $MNT/tmp/pisugar-poweroff.deb" | sha256sum -c - || die "checksum mismatch for pisugar-poweroff"
+install -m 0755 "$SCRIPT_DIR/rootfs/usr/local/sbin/consolepi-pisugar" "$MNT/usr/local/sbin/"
+install -m 0644 "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-pisugar.service" \
+    "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-pisugar-rtc.service" \
+    "$SCRIPT_DIR/rootfs/etc/systemd/system/consolepi-pisugar-rtc.timer" "$MNT/etc/systemd/system/"
+chroot "$MNT" /bin/bash -euo pipefail <<'EOF'
+export DEBIAN_FRONTEND=noninteractive
+pkgs="i2c-tools debconf-utils"
+apt-get install -y -qq --no-install-recommends $pkgs || { apt-get update -qq && apt-get install -y -qq --no-install-recommends $pkgs; }
+pw=$(head -c 18 /dev/urandom | base64)   # web UI is off; the package still wants a password
+debconf-set-selections <<SEL
+pisugar-server pisugar-server/model select PiSugar 3
+pisugar-server pisugar-server/address select 127.0.0.1
+pisugar-server pisugar-server/web boolean false
+pisugar-server pisugar-server/tcp boolean true
+pisugar-server pisugar-server/uds boolean true
+pisugar-server pisugar-server/auth-username string admin
+pisugar-server pisugar-server/auth-password password $pw
+pisugar-poweroff pisugar-poweroff/model select PiSugar 3
+SEL
+apt-get install -y -qq --no-install-recommends /tmp/pisugar-server.deb /tmp/pisugar-poweroff.deb
+rm -f /tmp/pisugar-server.deb /tmp/pisugar-poweroff.deb
+# off until consolepi-pisugar finds a PiSugar (on a Pi without one it would only log I2C errors)
+systemctl disable pisugar-server pisugar-poweroff 2>/dev/null || true
+systemctl enable consolepi-pisugar.service consolepi-pisugar-rtc.timer
+# I2C on - what 'raspi-config nonint do_i2c 0' does on a running system
+grep -q '^dtparam=i2c_arm=on' /boot/firmware/config.txt || echo 'dtparam=i2c_arm=on' >> /boot/firmware/config.txt
+grep -qx 'i2c-dev' /etc/modules || echo 'i2c-dev' >> /etc/modules
+echo "--- pisugar-server files:"; dpkg -L pisugar-server | grep -v '^/usr/share/doc' || true
+echo "--- /etc/default/pisugar-server:"; cat /etc/default/pisugar-server || true
+echo "--- pisugar-server unit:"; systemctl cat pisugar-server 2>/dev/null | grep -E '^(ExecStart|User|PrivateTmp)' || true
+conf=/etc/pisugar-server/config.json
+if [ ! -f $conf ]; then
+    echo "no $conf - pisugar config files:"; find /etc -path '*pisugar*' -type f; exit 1
+fi
+# defaults: shut down at 10 % (consolepi-setup.txt: battery_shutdown), long press on the button = power off
+python3 - $conf <<'PY'
+import json, sys
+p = sys.argv[1]
+c = json.load(open(p))
+c.update({"auto_shutdown_level": 10, "auto_shutdown_delay": 30,
+          "single_tap_enable": False, "double_tap_enable": False,
+          "long_tap_enable": True, "long_tap_shell": "/usr/bin/systemctl poweroff"})
+json.dump(c, open(p, "w"), indent=2)
+print(json.dumps(c, indent=2))
+PY
+# checks
+grep -qx 'dtparam=i2c_arm=on' /boot/firmware/config.txt
+command -v i2cget
+bash -n /usr/local/sbin/consolepi-pisugar
+test -L /etc/systemd/system/multi-user.target.wants/consolepi-pisugar.service
+test -L /etc/systemd/system/timers.target.wants/consolepi-pisugar-rtc.timer
+if systemctl is-enabled -q pisugar-server; then echo 'pisugar-server must be off'; exit 1; fi
+systemd-analyze verify /etc/systemd/system/consolepi-pisugar.service /etc/systemd/system/consolepi-pisugar-rtc.service \
+    /etc/systemd/system/consolepi-pisugar-rtc.timer 2>&1 | grep -v 'Failed to\|dbus' || true
+# no PiSugar / no I2C in the chroot: detect fails, boot is quiet, consolepi-battery prints nothing
+if /usr/local/sbin/consolepi-pisugar detect; then echo 'detect must fail in the chroot'; exit 1; fi
+out=$(/usr/local/sbin/consolepi-pisugar boot 2>&1); [ -z "$out" ] || { echo "$out"; exit 1; }
+out=$(/etc/ConsolePi/src/consolepi-commands/consolepi-battery 2>&1) && exit 1; [ -z "$out" ] || { echo "$out"; exit 1; }
+# battery_shutdown from consolepi-setup.txt ends up in the pisugar-server config
+T=$(mktemp -d); mkdir -p $T/boot/firmware $T/etc/pisugar-server
+cp $conf $T/etc/pisugar-server/
+printf 'battery_shutdown=15%%\r\n' > $T/boot/firmware/consolepi-setup.txt
+CONSOLEPI_SETUP_ROOT=$T CONSOLEPI_SETUP_DRY_RUN=1 /usr/local/sbin/consolepi-setup >/dev/null
+python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); assert c["auto_shutdown_level"] == 15 and c["long_tap_enable"], c' $T/etc/pisugar-server/config.json
+grep -q 'battery_shutdown: 15%' $T/boot/firmware/consolepi-setup.done.txt
+rm -rf $T
+echo "pisugar OK"
 EOF
 
 # smoke test with the image's real nmcli/openssl against a scratch root (no wifi_country/hostname: they act on the live system)

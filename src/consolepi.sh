@@ -54,6 +54,9 @@ header() {
 
 header x
 echo
+# PiSugar 3 battery (prints nothing without one)
+consolepi_battery=$(/etc/ConsolePi/src/consolepi-commands/consolepi-battery --menu 2>/dev/null) && echo -e "${_yellow}${consolepi_battery}${_norm}" && echo
+unset consolepi_battery
 echo -e "Use ${_green}consolepi-menu${_norm} to launch menu"
 echo -e "or ${_green}consolepi-help${_norm} for a list of other commands (extracted from README)"
 echo

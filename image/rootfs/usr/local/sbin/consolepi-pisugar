@@ -1,0 +1,81 @@
+#!/bin/bash
+# ConsolePi: PiSugar 3 battery board support.
+#
+# pisugar-server (battery level, safe shutdown at low battery, button, RTC) is installed in the image
+# but stays off: on a Pi without a PiSugar it would only log I2C errors.  This script switches it on
+# when a PiSugar answers on I2C, and off again when it is gone.
+#
+#   consolepi-pisugar boot    at boot (consolepi-pisugar.service): detect, start/stop pisugar-server,
+#                             set the clock from the PiSugar's RTC when there is no NTP time yet
+#   consolepi-pisugar sync    hourly (consolepi-pisugar-rtc.timer): write the NTP time to the RTC
+#   consolepi-pisugar detect  exit 0 if a PiSugar answers on I2C
+#
+# Settings: battery_shutdown in consolepi-setup.txt (see consolepi-setup).
+set -u
+
+I2C_BUS=${CONSOLEPI_PISUGAR_BUS:-1}
+I2C_ADDR=${CONSOLEPI_PISUGAR_ADDR:-0x57}          # PiSugar 3 battery controller
+BATTERY=/etc/ConsolePi/src/consolepi-commands/consolepi-battery
+SERVICES="pisugar-server pisugar-poweroff"
+
+log() { echo "consolepi-pisugar: $*"; }
+
+detect() {
+    command -v i2cget >/dev/null || return 1
+    [ -e "/dev/i2c-$I2C_BUS" ] || return 1
+    # register 0x00 of the PiSugar 3 controller; any answer means it is there
+    i2cget -y "$I2C_BUS" "$I2C_ADDR" 0x00 >/dev/null 2>&1
+}
+
+ntp_synced() {
+    [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ]
+}
+
+server_up() {
+    local i
+    for i in $(seq 1 ${1:-15}); do
+        "$BATTERY" >/dev/null 2>&1 && return 0
+        sleep 1
+    done
+    return 1
+}
+
+case "${1:-}" in
+detect)
+    detect
+    ;;
+boot)
+    if ! detect; then
+        if systemctl is-enabled -q pisugar-server 2>/dev/null; then
+            log "no PiSugar on I2C bus $I2C_BUS ($I2C_ADDR) any more - switching pisugar-server off"
+            systemctl disable --now $SERVICES >/dev/null 2>&1
+        fi
+        exit 0
+    fi
+    if ! systemctl is-enabled -q pisugar-server 2>/dev/null; then
+        log "PiSugar found on I2C bus $I2C_BUS ($I2C_ADDR) - switching pisugar-server on"
+        systemctl enable $SERVICES >/dev/null 2>&1
+    fi
+    systemctl start pisugar-server
+    if ! server_up 20; then
+        log "pisugar-server does not answer"
+        exit 1
+    fi
+    log "$("$BATTERY")"
+    if ntp_synced; then
+        "$BATTERY" --cmd rtc_pi2rtc >/dev/null 2>&1
+    else
+        # no network time (yet): take the time from the PiSugar's clock, so logs have the right time
+        "$BATTERY" --cmd rtc_rtc2pi >/dev/null 2>&1 && log "clock set from the PiSugar RTC: $(date)"
+    fi
+    ;;
+sync)
+    systemctl is-active -q pisugar-server 2>/dev/null || exit 0
+    ntp_synced || exit 0
+    "$BATTERY" --cmd rtc_pi2rtc >/dev/null 2>&1
+    ;;
+*)
+    echo "usage: $0 boot|sync|detect" >&2
+    exit 2
+    ;;
+esac

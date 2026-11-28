@@ -198,13 +198,18 @@ class ConsolePiMenu(Rename):
 
     @staticmethod
     def power_warning():
-        """Under-voltage warning line for the menu (weak power supply / power bank), None if all is fine."""
-        try:
-            out = subprocess.run(['/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck'],
-                                 capture_output=True, text=True, timeout=3).stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return out or None
+        """Status lines for the top of the menu: under-voltage warning (weak power supply / power bank)
+        and the battery of a PiSugar 3.  None if there is nothing to show."""
+        lines = []
+        for cmd in (['/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck'],
+                    ['/etc/ConsolePi/src/consolepi-commands/consolepi-battery', '--menu']):
+            try:
+                out = subprocess.run(cmd, capture_output=True, text=True, timeout=3).stdout.strip()
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if out:
+                lines.append(out)
+        return lines or None
 
     def picocom_help(self):
         print('----------------------- picocom Command Sequences -----------------------\n')

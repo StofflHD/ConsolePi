@@ -1,0 +1,10 @@
+[Unit]
+Description=ConsolePi PiSugar 3: keep the RTC on network time (hourly)
+Documentation=https://github.com/StofflHD/ConsolePi
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target

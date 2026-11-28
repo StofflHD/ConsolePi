@@ -320,6 +320,9 @@ main_menu() {
         # weak power supply / power bank warning (under-voltage)
         power_msg=$(/etc/ConsolePi/src/consolepi-commands/consolepi-powercheck 2>/dev/null)
         [[ -n $power_msg ]] && echo " $power_msg" && echo ''
+        # PiSugar 3 battery (nothing without one)
+        battery_msg=$(/etc/ConsolePi/src/consolepi-commands/consolepi-battery --menu 2>/dev/null)
+        [[ -n $battery_msg ]] && echo " $battery_msg" && echo ''
         [[ ${#tty_list[@]} -eq 0 ]] && echo ' No USB to Serial adapters found (r to refresh)'
         for this_tty in ${tty_list[@]}; do
             get_tty_name    # checks for alias created via udev rules and uses alias as a descriptor if exists

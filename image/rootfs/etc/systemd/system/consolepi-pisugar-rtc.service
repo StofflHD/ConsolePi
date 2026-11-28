@@ -1,0 +1,8 @@
+[Unit]
+Description=ConsolePi PiSugar 3: write the network time to the RTC
+Documentation=https://github.com/StofflHD/ConsolePi
+After=consolepi-pisugar.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/consolepi-pisugar sync

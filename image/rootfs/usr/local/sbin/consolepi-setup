@@ -15,6 +15,7 @@ start:
     ssh_key                    public key added to the user's authorized_keys
     hotspot_ssid / hotspot_password   ConsolePi fallback hotspot
     bluetooth_pin              PIN for Bluetooth pairing (4-16 digits, "none" = pairing without PIN)
+    battery_shutdown           PiSugar 3: shut down at this battery level in percent (0 = never)
 
 The file holds plain text passwords, so it is deleted once applied.  A summary without secrets
 is left in consolepi-setup.done.txt.  Lines starting with # are ignored.
@@ -36,10 +37,11 @@ NM_DIR = ROOT / "etc/NetworkManager/system-connections"
 HOTSPOT = NM_DIR / "hotspot.nmconnection"
 CONSOLEPI_YAML = ROOT / "etc/ConsolePi/ConsolePi.yaml"
 BT_CONF = ROOT / "etc/consolepi-bt.conf"      # read by consolepi-bt-agent
+PISUGAR_CONF = ROOT / "etc/pisugar-server/config.json"   # pisugar-server (PiSugar 3 battery board)
 DRY_RUN = os.environ.get("CONSOLEPI_SETUP_DRY_RUN") == "1"  # testing: don't run system commands
 
 KEYS = {"user", "password", "wifi_ssid", "wifi_password", "wifi_bssid", "wifi_country", "hostname", "ssh_key",
-        "hotspot_ssid", "hotspot_password", "bluetooth_pin"}
+        "hotspot_ssid", "hotspot_password", "bluetooth_pin", "battery_shutdown"}
 
 summary: list = []
 errors: list = []
@@ -303,6 +305,25 @@ def apply_bluetooth(cfg: dict) -> None:
     summary.append("bluetooth_pin: " + ("set (paired devices have to pair again)" if pin else "removed, pairing without PIN"))
 
 
+def apply_battery(cfg: dict) -> None:
+    level = cfg.get("battery_shutdown")
+    if level is None:
+        return
+    level = level.strip().rstrip("%").strip()
+    if not re.fullmatch(r"\d{1,2}", level) or int(level) > 50:
+        errors.append("battery_shutdown must be 0-50 (percent, 0 = never) -> unchanged")
+        return
+    if not PISUGAR_CONF.exists():
+        errors.append("battery_shutdown: pisugar-server is not installed -> ignored")
+        return
+    import json
+    conf = json.loads(PISUGAR_CONF.read_text() or "{}")
+    conf["auto_shutdown_level"] = int(level)
+    conf.setdefault("auto_shutdown_delay", 30)
+    PISUGAR_CONF.write_text(json.dumps(conf, indent=2) + "\n")
+    summary.append("battery_shutdown: " + (f"{level}%" if int(level) else "off"))
+
+
 def main() -> int:
     if not CFG.exists():
         return 0
@@ -311,7 +332,7 @@ def main() -> int:
         log("no settings in consolepi-setup.txt, nothing to do")
         return 0
     for step in (apply_user, apply_country, apply_wifi, apply_hostname, apply_ssh_key, apply_hotspot,
-                 apply_bluetooth):
+                 apply_bluetooth, apply_battery):
         try:
             step(cfg)
         except Exception as e:  # keep going, one bad setting shouldn't block the rest

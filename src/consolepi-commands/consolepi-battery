@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+"""ConsolePi: battery status of a PiSugar 3 (battery board under the Pi Zero / Pi 3 / Pi 4).
+
+Talks to pisugar-server (installed in the ConsolePi image, started by consolepi-pisugar only when a
+PiSugar answers on I2C).  Without a PiSugar it prints nothing and exits 1, so callers can just use
+whatever it prints.
+
+    consolepi-battery            Battery 76% - charging          (nothing if there is no PiSugar)
+    consolepi-battery --menu     same line, '!! Battery low ...' below 20% on battery
+    consolepi-battery --cmd 'rtc_rtc2pi'   send a raw pisugar-server command, print the answer
+
+Only uses the Python standard library.
+"""
+import argparse
+import socket
+import sys
+
+UDS = "/tmp/pisugar-server.sock"
+TCP = ("127.0.0.1", 8423)
+LOW = 20          # percent: warn below this when not plugged in
+TIMEOUT = 1.0
+
+
+def _talk(sock, cmd: str) -> str:
+    sock.settimeout(TIMEOUT)
+    sock.sendall(cmd.encode() + b"\n")
+    data = b""
+    while b"\n" not in data:
+        chunk = sock.recv(1024)
+        if not chunk:
+            break
+        data += chunk
+    return data.decode(errors="replace").strip()
+
+
+def query(cmd: str) -> str:
+    """One command to pisugar-server (unix socket first, then local TCP). Raises OSError if it isn't there."""
+    err = None
+    for family, addr in ((socket.AF_UNIX, UDS), (socket.AF_INET, TCP)):
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.settimeout(TIMEOUT)
+                s.connect(addr)
+                return _talk(s, cmd)
+        except OSError as e:
+            err = e
+    raise err
+
+
+def value(cmd: str) -> str:
+    """'get battery' -> '76.5' (answers look like 'battery: 76.5')."""
+    ans = query(cmd)
+    key = cmd.split(None, 1)[-1]
+    for line in ans.splitlines():
+        k, sep, v = line.partition(":")
+        if sep and k.strip() == key:
+            return v.strip()
+    raise ValueError(f"unexpected answer to {cmd!r}: {ans!r}")
+
+
+def status():
+    """(percent, plugged) or None when there is no PiSugar / pisugar-server."""
+    try:
+        pct = float(value("get battery"))
+    except (OSError, ValueError):
+        return None
+    plugged = None
+    for cmd in ("get battery_power_plugged", "get battery_charging"):
+        try:
+            plugged = value(cmd).lower() == "true"
+            break
+        except (OSError, ValueError):
+            continue
+    return max(0.0, min(100.0, pct)), plugged
+
+
+def line(pct: float, plugged) -> str:
+    state = {True: "charging", False: "on battery", None: ""}[plugged]
+    return f"Battery {pct:.0f}%" + (f" - {state}" if state else "")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Battery status of a PiSugar 3")
+    ap.add_argument("--menu", action="store_true", help="add a low battery warning")
+    ap.add_argument("--cmd", metavar="COMMAND", help="send a raw pisugar-server command")
+    a = ap.parse_args()
+
+    if a.cmd:
+        try:
+            print(query(a.cmd))
+            return 0
+        except OSError as e:
+            print(f"pisugar-server not reachable: {e}", file=sys.stderr)
+            return 1
+
+    st = status()
+    if st is None:
+        return 1
+    pct, plugged = st
+    if a.menu and plugged is False and pct < LOW:
+        print(f"!! Battery low: {pct:.0f}% - plug in the charger (the Pi shuts down by itself when it is empty)")
+    else:
+        print(line(pct, plugged))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
