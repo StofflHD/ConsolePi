@@ -41,6 +41,8 @@ Not supported: Pi Zero / Zero W (v1), Pi 1 and Pi 2 – they can't run 64 bit.
    hotspot_password=my-hotspot-password
    bluetooth_pin=12345678
    ```
+   Several access points with the same WiFi name (mesh, UniFi …) and the Pi keeps dropping the
+   connection? `wifi_bssid=aa:bb:cc:dd:ee:ff` ties it to the access point with that MAC (roaming off).
 3. Boot the Pi. The settings are applied on first boot, then `consolepi-setup.txt` is deleted
    (it holds passwords). What was applied – and any problems – is in `consolepi-setup.done.txt`
    on the same partition.

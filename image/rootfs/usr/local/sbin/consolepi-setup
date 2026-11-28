@@ -8,6 +8,8 @@ start:
     user / password            login user: first boot renames the default user (via RPi OS
                                userconf.txt), later boots change the password (or rename uid 1000)
     wifi_ssid / wifi_password  WiFi to join as client
+    wifi_bssid                 optional: only use the access point with this MAC (aa:bb:cc:dd:ee:ff),
+                               stops the Pi roaming to other APs of the same WiFi
     wifi_country               WiFi regulatory domain (e.g. DE)
     hostname                   hostname
     ssh_key                    public key added to the user's authorized_keys
@@ -36,7 +38,7 @@ CONSOLEPI_YAML = ROOT / "etc/ConsolePi/ConsolePi.yaml"
 BT_CONF = ROOT / "etc/consolepi-bt.conf"      # read by consolepi-bt-agent
 DRY_RUN = os.environ.get("CONSOLEPI_SETUP_DRY_RUN") == "1"  # testing: don't run system commands
 
-KEYS = {"user", "password", "wifi_ssid", "wifi_password", "wifi_country", "hostname", "ssh_key",
+KEYS = {"user", "password", "wifi_ssid", "wifi_password", "wifi_bssid", "wifi_country", "hostname", "ssh_key",
         "hotspot_ssid", "hotspot_password", "bluetooth_pin"}
 
 summary: list = []
@@ -170,23 +172,31 @@ def apply_country(cfg: dict) -> None:
 
 def apply_wifi(cfg: dict) -> None:
     ssid, psk = cfg.get("wifi_ssid"), cfg.get("wifi_password", "")
+    bssid = cfg.get("wifi_bssid", "").strip().replace("-", ":").upper()
     if not ssid:
+        if bssid:
+            errors.append("wifi_bssid needs wifi_ssid -> ignored")
         return
     if psk and not 8 <= len(psk) <= 63:
         errors.append("wifi_password must be 8-63 characters -> WiFi not configured")
+        return
+    if bssid and not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", bssid):
+        errors.append(f"invalid wifi_bssid '{cfg['wifi_bssid']}' (e.g. aa:bb:cc:dd:ee:ff) -> WiFi not configured")
         return
     cmd = ["nmcli", "--offline", "connection", "add", "type", "wifi", "con-name", ssid, "ssid", ssid,
            "connection.uuid", str(uuid.uuid4()), "connection.autoconnect", "yes",
            "connection.autoconnect-priority", "10"]   # hotspot has -999, so a client WiFi always wins
     if psk:
         cmd += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", psk]
+    if bssid:
+        cmd += ["802-11-wireless.bssid", bssid]   # pin to one AP: no roaming to other APs
     keyfile = run(cmd)
     NM_DIR.mkdir(parents=True, exist_ok=True)
     name = re.sub(r"[^A-Za-z0-9._-]", "_", ssid)
     dst = NM_DIR / f"wifi-{name}.nmconnection"
     dst.write_text(keyfile)
     os.chmod(dst, 0o600)
-    summary.append(f"wifi: {ssid}")
+    summary.append(f"wifi: {ssid}" + (f" (only access point {bssid})" if bssid else ""))
 
 
 def apply_hostname(cfg: dict) -> None:

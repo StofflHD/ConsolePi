@@ -286,13 +286,14 @@ grep -q 'Windows-1252' $T/boot/firmware/consolepi-setup.done.txt
 rm $T/boot/firmware/userconf.txt $T/boot/firmware/consolepi-setup.done.txt
 cp /etc/NetworkManager/system-connections/hotspot.nmconnection $T/etc/NetworkManager/system-connections/
 cp /etc/ConsolePi/ConsolePi.yaml $T/etc/ConsolePi/
-printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\nbluetooth_pin=24681357\r\n' > $T/boot/firmware/consolepi-setup.txt
+printf 'user=smoke\r\npassword=smoke-pass\r\nwifi_ssid=Smoke Net;1\r\nwifi_password=smoke-psk-123\r\nwifi_bssid=e0-63-da-c2-11-52\r\nssh_key=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsmoke test\r\nhotspot_password=NewHotspotPW\r\nbluetooth_pin=24681357\r\n' > $T/boot/firmware/consolepi-setup.txt
 CONSOLEPI_SETUP_ROOT=$T /usr/local/sbin/consolepi-setup
 test ! -e $T/boot/firmware/consolepi-setup.txt
 grep -q '^smoke:\$6\$' $T/boot/firmware/userconf.txt
 f=$(ls $T/etc/NetworkManager/system-connections/wifi-*.nmconnection)
 cat "$f"
 grep -q '^psk=smoke-psk-123' "$f"
+grep -qx 'bssid=E0:63:DA:C2:11:52' "$f"
 grep -q '^psk=NewHotspotPW' $T/etc/NetworkManager/system-connections/hotspot.nmconnection
 grep -q "wlan_psk: 'NewHotspotPW'" $T/etc/ConsolePi/ConsolePi.yaml
 grep -qx 'pin=24681357' $T/etc/consolepi-bt.conf
