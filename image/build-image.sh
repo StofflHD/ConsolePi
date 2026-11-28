@@ -325,7 +325,7 @@ c.update({"auto_shutdown_level": 10, "auto_shutdown_delay": 30,
           "single_tap_enable": False, "double_tap_enable": False,
           "long_tap_enable": True, "long_tap_shell": "/usr/bin/systemctl poweroff"})
 json.dump(c, open(p, "w"), indent=2)
-print(json.dumps(c, indent=2))
+print(json.dumps({k: ("***" if "password" in k else v) for k, v in c.items()}, indent=2))
 PY
 # checks
 grep -qx 'dtparam=i2c_arm=on' /boot/firmware/config.txt
